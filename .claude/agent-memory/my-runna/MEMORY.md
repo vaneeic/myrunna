@@ -2,6 +2,7 @@
 
 ## Project Overview
 Personal running plan management app. Monorepo at `/Users/vaneeic/myrunna/`.
+GitHub repo: https://github.com/vaneeic/myrunna (SSH: git@github.com:vaneeic/myrunna.git)
 
 ## Tech Stack
 - Frontend: Angular 19 (standalone, signals) + Angular Material + TailwindCSS
