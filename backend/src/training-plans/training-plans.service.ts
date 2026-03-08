@@ -26,6 +26,7 @@ import {
 } from '../db/schema';
 import * as schema from '../db/schema';
 import { CreatePlanDto } from './dto/create-plan.dto';
+import { UpdateSessionDto } from './dto/update-session.dto';
 
 type SessionType =
   | 'easy_run'
@@ -248,6 +249,56 @@ export class TrainingPlansService {
       .where(eq(trainingPlans.id, planId));
 
     return { message: 'Plan deleted' };
+  }
+
+  async updateSession(
+    planId: string,
+    sessionId: string,
+    userId: string,
+    dto: UpdateSessionDto,
+  ) {
+    // Verify the plan belongs to this user
+    const plan = await this.db
+      .select({ id: trainingPlans.id })
+      .from(trainingPlans)
+      .where(and(eq(trainingPlans.id, planId), eq(trainingPlans.userId, userId)))
+      .limit(1);
+
+    if (!plan[0]) throw new NotFoundException('Training plan not found');
+
+    // Verify the session exists and belongs to a week of this plan
+    const session = await this.db
+      .select({
+        id: trainingSessions.id,
+        weekId: trainingSessions.weekId,
+      })
+      .from(trainingSessions)
+      .innerJoin(trainingWeeks, eq(trainingWeeks.id, trainingSessions.weekId))
+      .where(
+        and(
+          eq(trainingSessions.id, sessionId),
+          eq(trainingWeeks.planId, planId),
+        ),
+      )
+      .limit(1);
+
+    if (!session[0]) throw new NotFoundException('Session not found');
+
+    const updateData: Partial<typeof trainingSessions.$inferInsert> = {};
+    if (dto.date !== undefined) updateData.date = dto.date;
+    if (dto.sessionType !== undefined) updateData.sessionType = dto.sessionType;
+    if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.plannedDistanceKm !== undefined) updateData.plannedDistanceKm = dto.plannedDistanceKm;
+    if (dto.plannedDurationMin !== undefined) updateData.plannedDurationMin = dto.plannedDurationMin;
+    if (dto.completed !== undefined) updateData.completed = dto.completed;
+
+    const [updated] = await this.db
+      .update(trainingSessions)
+      .set(updateData)
+      .where(eq(trainingSessions.id, sessionId))
+      .returning();
+
+    return updated;
   }
 
   async setActive(planId: string, userId: string) {

@@ -13,6 +13,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { TrainingPlansService } from './training-plans.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
+import { UpdateSessionDto } from './dto/update-session.dto';
 
 @ApiTags('training-plans')
 @ApiBearerAuth()
@@ -61,5 +62,16 @@ export class TrainingPlansController {
     @CurrentUser() user: { id: string },
   ) {
     return this.plansService.delete(id, user.id);
+  }
+
+  @Patch(':id/sessions/:sessionId')
+  @ApiOperation({ summary: 'Update a single training session (for drag-and-drop edits and completion marking)' })
+  updateSession(
+    @Param('id') planId: string,
+    @Param('sessionId') sessionId: string,
+    @CurrentUser() user: { id: string },
+    @Body() dto: UpdateSessionDto,
+  ) {
+    return this.plansService.updateSession(planId, sessionId, user.id, dto);
   }
 }
