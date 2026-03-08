@@ -149,18 +149,24 @@ API docs available at: http://localhost:3000/api/docs
 
 ### `PATCH /api/plans/:planId/sessions/:sessionId`
 
-Update a training session, including skip state and optional Strava activity URL.
+Update a training session — mark as skipped, or link a synced Strava activity.
 
 **Request body** (all fields optional):
 
 ```json
 {
-  "skipped": true,
-  "stravaActivityUrl": "https://www.strava.com/activities/123456789"
+  "skipped": true
+}
+```
+
+```json
+{
+  "stravaActivityId": "12345678901"
 }
 ```
 
 **Notes:**
-- Setting `skipped: true` on a completed session also clears `completed`
-- Set `stravaActivityUrl` to `""` to remove an existing link
+- Setting `stravaActivityId` automatically sets `completed: true` and `skipped: false`
+- `stravaActivityId` is the Strava numeric ID from your synced `strava_activities` table
+- Set `stravaActivityId` to `null` to unlink a previously linked activity
 - Auth header required: `Authorization: Bearer <jwt>`

@@ -434,6 +434,7 @@ export class PlanCalendarComponent implements OnInit {
   sessionClass(session: TrainingSession): string {
     if (session.skipped) return 'bg-amber-100 text-amber-700 opacity-75 line-through';
     const cfg = SESSION_TYPE_CONFIG[session.sessionType];
+    if (session.stravaActivity) return `${cfg.bgColor} ${cfg.color} ring-1 ring-orange-300`;
     if (session.completed) return `${cfg.bgColor} ${cfg.color} opacity-75`;
     return `${cfg.bgColor} ${cfg.color}`;
   }
@@ -454,7 +455,7 @@ export class PlanCalendarComponent implements OnInit {
     if (session.description) parts.push(session.description);
     if (session.completed) parts.push('✓ Completed');
     if (session.skipped) parts.push('⊘ Skipped');
-    if (session.skipped && session.stravaActivityUrl) parts.push('Strava linked');
+    if (session.stravaActivity) parts.push(`🏃 ${session.stravaActivity.name} (${(session.stravaActivity.distance / 1000).toFixed(1)} km)`);
     return parts.join(' · ');
   }
 

@@ -63,8 +63,8 @@ export class UpdateSessionDto {
   @IsBoolean()
   skipped?: boolean;
 
-  @ApiProperty({ example: 'https://www.strava.com/activities/123456789', required: false })
+  @ApiProperty({ example: '12345678901', required: false, description: 'Strava numeric activity ID from strava_activities.strava_id — links activity and marks session completed' })
   @IsOptional()
   @IsString()
-  stravaActivityUrl?: string;
+  stravaActivityId?: string | null;
 }

@@ -141,18 +141,66 @@ describe('TrainingPlansService - updateSession', () => {
     });
   });
 
-  describe('stravaActivityUrl field', () => {
-    it('should set a Strava activity URL for a session', async () => {
+  describe('stravaActivityId field', () => {
+    it('should link a Strava activity and auto-mark session completed', async () => {
       // Arrange
-      const stravaUrl = 'https://www.strava.com/activities/123456789';
-      const dto: UpdateSessionDto = { stravaActivityUrl: stravaUrl };
+      const stravaId = '12345678901';
+      const dto: UpdateSessionDto = { stravaActivityId: stravaId };
+      const mockPlan = [{ id: mockPlanId }];
+      const mockSession = [{ id: mockSessionId, weekId: mockWeekId }];
+      const updatedSession = {
+        id: mockSessionId,
+        skipped: false,
+        completed: true,
+        stravaActivityId: stravaId,
+      };
+
+      mockDb.select.mockReturnValueOnce(mockDb);
+      mockDb.from.mockReturnValueOnce(mockDb);
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce(mockPlan);
+
+      mockDb.select.mockReturnValueOnce(mockDb);
+      mockDb.from.mockReturnValueOnce(mockDb);
+      mockDb.innerJoin.mockReturnValueOnce(mockDb);
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce(mockSession);
+
+      mockDb.update.mockReturnValueOnce(mockDb);
+      mockDb.set.mockReturnValueOnce(mockDb);
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.returning.mockResolvedValueOnce([updatedSession]);
+
+      // Act
+      const result = await service.updateSession(
+        mockPlanId,
+        mockSessionId,
+        mockUserId,
+        dto,
+      );
+
+      // Assert
+      expect(result.stravaActivityId).toBe(stravaId);
+      expect(result.completed).toBe(true);
+      expect(mockDb.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stravaActivityId: stravaId,
+          completed: true,
+          skipped: false,
+        }),
+      );
+    });
+
+    it('should unlink a Strava activity when set to null', async () => {
+      // Arrange
+      const dto: UpdateSessionDto = { stravaActivityId: null };
       const mockPlan = [{ id: mockPlanId }];
       const mockSession = [{ id: mockSessionId, weekId: mockWeekId }];
       const updatedSession = {
         id: mockSessionId,
         skipped: false,
         completed: false,
-        stravaActivityUrl: stravaUrl,
+        stravaActivityId: null,
       };
 
       mockDb.select.mockReturnValueOnce(mockDb);
@@ -180,23 +228,18 @@ describe('TrainingPlansService - updateSession', () => {
       );
 
       // Assert
-      expect(result.stravaActivityUrl).toBe(stravaUrl);
+      expect(result.stravaActivityId).toBeNull();
       expect(mockDb.set).toHaveBeenCalledWith(
-        expect.objectContaining({ stravaActivityUrl: stravaUrl }),
+        expect.objectContaining({ stravaActivityId: null }),
       );
     });
 
-    it('should update Strava activity URL (edit existing)', async () => {
-      // Arrange
-      const newStravaUrl = 'https://www.strava.com/activities/987654321';
-      const dto: UpdateSessionDto = { stravaActivityUrl: newStravaUrl };
+    it('should NOT auto-complete when stravaActivityId is set to null (unlink)', async () => {
+      // Arrange — only stravaActivityId: null, no explicit completed field
+      const dto: UpdateSessionDto = { stravaActivityId: null };
       const mockPlan = [{ id: mockPlanId }];
       const mockSession = [{ id: mockSessionId, weekId: mockWeekId }];
-      const updatedSession = {
-        id: mockSessionId,
-        skipped: true,
-        stravaActivityUrl: newStravaUrl,
-      };
+      const updatedSession = { id: mockSessionId, stravaActivityId: null, completed: false };
 
       mockDb.select.mockReturnValueOnce(mockDb);
       mockDb.from.mockReturnValueOnce(mockDb);
@@ -214,110 +257,11 @@ describe('TrainingPlansService - updateSession', () => {
       mockDb.where.mockReturnValueOnce(mockDb);
       mockDb.returning.mockResolvedValueOnce([updatedSession]);
 
-      // Act
-      const result = await service.updateSession(
-        mockPlanId,
-        mockSessionId,
-        mockUserId,
-        dto,
-      );
+      await service.updateSession(mockPlanId, mockSessionId, mockUserId, dto);
 
-      // Assert
-      expect(result.stravaActivityUrl).toBe(newStravaUrl);
-    });
-
-    it('should clear Strava activity URL when set to empty string', async () => {
-      // Arrange
-      const dto: UpdateSessionDto = { stravaActivityUrl: '' };
-      const mockPlan = [{ id: mockPlanId }];
-      const mockSession = [{ id: mockSessionId, weekId: mockWeekId }];
-      const updatedSession = {
-        id: mockSessionId,
-        skipped: true,
-        stravaActivityUrl: '',
-      };
-
-      mockDb.select.mockReturnValueOnce(mockDb);
-      mockDb.from.mockReturnValueOnce(mockDb);
-      mockDb.where.mockReturnValueOnce(mockDb);
-      mockDb.limit.mockResolvedValueOnce(mockPlan);
-
-      mockDb.select.mockReturnValueOnce(mockDb);
-      mockDb.from.mockReturnValueOnce(mockDb);
-      mockDb.innerJoin.mockReturnValueOnce(mockDb);
-      mockDb.where.mockReturnValueOnce(mockDb);
-      mockDb.limit.mockResolvedValueOnce(mockSession);
-
-      mockDb.update.mockReturnValueOnce(mockDb);
-      mockDb.set.mockReturnValueOnce(mockDb);
-      mockDb.where.mockReturnValueOnce(mockDb);
-      mockDb.returning.mockResolvedValueOnce([updatedSession]);
-
-      // Act
-      const result = await service.updateSession(
-        mockPlanId,
-        mockSessionId,
-        mockUserId,
-        dto,
-      );
-
-      // Assert
-      expect(result.stravaActivityUrl).toBe('');
-      expect(mockDb.set).toHaveBeenCalledWith(
-        expect.objectContaining({ stravaActivityUrl: '' }),
-      );
-    });
-  });
-
-  describe('combined skipped and stravaActivityUrl', () => {
-    it('should mark session as skipped with Strava URL simultaneously', async () => {
-      // Arrange
-      const stravaUrl = 'https://www.strava.com/activities/555666777';
-      const dto: UpdateSessionDto = {
-        skipped: true,
-        stravaActivityUrl: stravaUrl,
-      };
-      const mockPlan = [{ id: mockPlanId }];
-      const mockSession = [{ id: mockSessionId, weekId: mockWeekId }];
-      const updatedSession = {
-        id: mockSessionId,
-        skipped: true,
-        completed: false,
-        stravaActivityUrl: stravaUrl,
-      };
-
-      mockDb.select.mockReturnValueOnce(mockDb);
-      mockDb.from.mockReturnValueOnce(mockDb);
-      mockDb.where.mockReturnValueOnce(mockDb);
-      mockDb.limit.mockResolvedValueOnce(mockPlan);
-
-      mockDb.select.mockReturnValueOnce(mockDb);
-      mockDb.from.mockReturnValueOnce(mockDb);
-      mockDb.innerJoin.mockReturnValueOnce(mockDb);
-      mockDb.where.mockReturnValueOnce(mockDb);
-      mockDb.limit.mockResolvedValueOnce(mockSession);
-
-      mockDb.update.mockReturnValueOnce(mockDb);
-      mockDb.set.mockReturnValueOnce(mockDb);
-      mockDb.where.mockReturnValueOnce(mockDb);
-      mockDb.returning.mockResolvedValueOnce([updatedSession]);
-
-      // Act
-      const result = await service.updateSession(
-        mockPlanId,
-        mockSessionId,
-        mockUserId,
-        dto,
-      );
-
-      // Assert
-      expect(result.skipped).toBe(true);
-      expect(result.stravaActivityUrl).toBe(stravaUrl);
-      expect(mockDb.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          skipped: true,
-          stravaActivityUrl: stravaUrl,
-        }),
+      // completed should NOT have been forced to true
+      expect(mockDb.set).not.toHaveBeenCalledWith(
+        expect.objectContaining({ completed: true }),
       );
     });
   });

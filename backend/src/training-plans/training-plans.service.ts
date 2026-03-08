@@ -20,6 +20,7 @@ import {
   trainingPlans,
   trainingWeeks,
   trainingSessions,
+  stravaActivities,
   races,
   users,
   NewTrainingPlan,
@@ -72,12 +73,20 @@ export class TrainingPlansService {
       .where(eq(trainingWeeks.planId, planId));
 
     const weekIds = weeks.map((w) => w.id);
-    const sessions = weekIds.length
+    const rawSessions = weekIds.length
       ? await this.db
-          .select()
+          .select({ session: trainingSessions, stravaActivity: stravaActivities })
           .from(trainingSessions)
+          .leftJoin(
+            stravaActivities,
+            eq(stravaActivities.stravaId, trainingSessions.stravaActivityId),
+          )
           .where(inArray(trainingSessions.weekId, weekIds))
       : [];
+    const sessions = rawSessions.map(({ session, stravaActivity }) => ({
+      ...session,
+      stravaActivity: stravaActivity ?? null,
+    }));
 
     const planRaces = await this.db
       .select()
@@ -530,7 +539,14 @@ export class TrainingPlansService {
     if (dto.plannedDurationMin !== undefined) updateData.plannedDurationMin = dto.plannedDurationMin;
     if (dto.completed !== undefined) updateData.completed = dto.completed;
     if (dto.skipped !== undefined) updateData.skipped = dto.skipped;
-    if (dto.stravaActivityUrl !== undefined) updateData.stravaActivityUrl = dto.stravaActivityUrl;
+    if (dto.stravaActivityId !== undefined) {
+      updateData.stravaActivityId = dto.stravaActivityId ?? null;
+      // Linking an activity automatically marks the session completed and unsets skipped
+      if (dto.stravaActivityId) {
+        updateData.completed = true;
+        updateData.skipped = false;
+      }
+    }
 
     const [updated] = await this.db
       .update(trainingSessions)
