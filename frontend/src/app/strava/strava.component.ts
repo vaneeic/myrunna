@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
@@ -8,6 +8,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { StravaService } from '../shared/services/strava.service';
 
 @Component({
@@ -25,6 +26,7 @@ import { StravaService } from '../shared/services/strava.service';
     MatChipsModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
+    MatPaginatorModule,
   ],
   template: `
     <div class="p-6 max-w-5xl mx-auto">
@@ -104,6 +106,13 @@ import { StravaService } from '../shared/services/strava.service';
               <td mat-cell *matCellDef="let a">{{ formatTime(a.movingTime) }}</td>
             </ng-container>
 
+            <ng-container matColumnDef="avgPace">
+              <th mat-header-cell *matHeaderCellDef>Avg Pace</th>
+              <td mat-cell *matCellDef="let a">
+                {{ formatPace(a.distance, a.movingTime) }}
+              </td>
+            </ng-container>
+
             <ng-container matColumnDef="heartrate">
               <th mat-header-cell *matHeaderCellDef>Avg HR</th>
               <td mat-cell *matCellDef="let a">
@@ -129,6 +138,16 @@ import { StravaService } from '../shared/services/strava.service';
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
             <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50"></tr>
           </table>
+          
+          <!-- Pagination -->
+          <mat-paginator 
+            [length]="strava.totalActivities()"
+            [pageSize]="pageSize()"
+            [pageIndex]="currentPage()"
+            [pageSizeOptions]="[10, 20, 50, 100]"
+            (page)="onPageChange($event)"
+            showFirstLastButtons>
+          </mat-paginator>
         </mat-card>
       } @else if (strava.status().connected) {
         <mat-card class="p-8 text-center">
@@ -147,19 +166,38 @@ import { StravaService } from '../shared/services/strava.service';
 })
 export class StravaComponent implements OnInit {
   readonly strava = inject(StravaService);
-  readonly displayedColumns = ['date', 'name', 'distance', 'time', 'heartrate', 'suffer'];
+  readonly displayedColumns = ['date', 'name', 'distance', 'time', 'avgPace', 'heartrate', 'suffer'];
 
   private readonly snackBar = inject(MatSnackBar);
+  
+  // Pagination state
+  readonly currentPage = signal(0);
+  readonly pageSize = signal(20);
 
   ngOnInit() {
     this.strava.loadStatus().subscribe({
       next: (s) => {
         if (s.connected) {
-          this.strava.loadActivities().subscribe();
+          this.loadPage();
         }
       },
       error: () => {},
     });
+  }
+
+  loadPage() {
+    this.strava.loadActivities({
+      page: this.currentPage() + 1, // Backend uses 1-based indexing
+      perPage: this.pageSize(),
+    }).subscribe({
+      error: () => {},
+    });
+  }
+
+  onPageChange(event: PageEvent) {
+    this.currentPage.set(event.pageIndex);
+    this.pageSize.set(event.pageSize);
+    this.loadPage();
   }
 
   syncActivities() {
@@ -170,8 +208,9 @@ export class StravaComponent implements OnInit {
           'Close',
           { duration: 4000 },
         );
-        // Reload the list after sync
-        this.strava.loadActivities().subscribe();
+        // Reset to first page and reload after sync
+        this.currentPage.set(0);
+        this.loadPage();
         // Refresh status to get new lastSyncedAt
         this.strava.loadStatus().subscribe();
       },
@@ -190,5 +229,18 @@ export class StravaComponent implements OnInit {
       return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     }
     return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  formatPace(distanceMeters: number, movingTimeSeconds: number): string {
+    if (!distanceMeters || !movingTimeSeconds) return '—';
+    
+    const distanceKm = distanceMeters / 1000;
+    const timeMinutes = movingTimeSeconds / 60;
+    const paceMinPerKm = timeMinutes / distanceKm;
+    
+    const minutes = Math.floor(paceMinPerKm);
+    const seconds = Math.round((paceMinPerKm - minutes) * 60);
+    
+    return `${minutes}:${String(seconds).padStart(2, '0')}/km`;
   }
 }

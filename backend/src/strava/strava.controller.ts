@@ -106,9 +106,52 @@ export class StravaController {
   @Post('sync')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Manually trigger Strava activity sync (last 90 days)' })
-  sync(@CurrentUser() user: { id: string }) {
-    return this.stravaService.syncActivities(user.id, 90);
+  @ApiOperation({ 
+    summary: 'Manually trigger Strava activity sync',
+    description: 'Sync activities from Strava. Default is last 365 days for historical import. Use query parameters to customize the date range.'
+  })
+  @ApiQuery({ 
+    name: 'daysBack', 
+    required: false, 
+    type: Number,
+    description: 'Number of days to look back (default: 365 for historical import)'
+  })
+  @ApiQuery({ 
+    name: 'afterDate', 
+    required: false, 
+    type: String,
+    description: 'Start date for sync (ISO 8601 format, e.g., 2025-01-01)'
+  })
+  @ApiQuery({ 
+    name: 'beforeDate', 
+    required: false, 
+    type: String,
+    description: 'End date for sync (ISO 8601 format, e.g., 2025-12-31)'
+  })
+  sync(
+    @CurrentUser() user: { id: string },
+    @Query('daysBack') daysBack?: number,
+    @Query('afterDate') afterDate?: string,
+    @Query('beforeDate') beforeDate?: string,
+  ) {
+    return this.stravaService.syncActivities(user.id, {
+      daysBack: daysBack ? parseInt(String(daysBack), 10) : undefined,
+      afterDate,
+      beforeDate,
+    });
+  }
+
+  @Post('recalculate-paces')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Recalculate pace zones from existing Strava activities',
+    description: 'Analyzes your synced Strava activities to recalculate average paces for different distances (5K, 10K, 15K, half marathon). Does not sync new activities.'
+  })
+  async recalculatePaces(@CurrentUser() user: { id: string }) {
+    await this.stravaService.updateUserPacesByDistance(user.id);
+    return { message: 'Paces recalculated successfully from your Strava activities' };
   }
 
   @Get('activities')

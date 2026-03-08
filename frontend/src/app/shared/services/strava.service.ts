@@ -31,14 +31,24 @@ export interface StravaActivity {
   sufferScore?: number;
 }
 
+export interface ActivitiesResponse {
+  activities: StravaActivity[];
+  total: number;
+  page: number;
+  perPage: number;
+  totalPages: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class StravaService {
   private readonly _status = signal<StravaStatus>({ connected: false });
   private readonly _activities = signal<StravaActivity[]>([]);
+  private readonly _totalActivities = signal(0);
   private readonly _syncing = signal(false);
 
   readonly status = this._status.asReadonly();
   readonly activities = this._activities.asReadonly();
+  readonly totalActivities = this._totalActivities.asReadonly();
   readonly syncing = this._syncing.asReadonly();
 
   constructor(private readonly api: ApiService) {}
@@ -51,25 +61,44 @@ export class StravaService {
 
   loadActivities(params?: { page?: number; perPage?: number }) {
     return this.api
-      .get<StravaActivity[]>('/strava/activities', {
+      .get<ActivitiesResponse>('/strava/activities', {
         page: params?.page ?? 1,
         perPage: params?.perPage ?? 20,
       })
-      .pipe(tap((acts) => this._activities.set(acts)));
+      .pipe(
+        tap((response) => {
+          this._activities.set(response.activities);
+          this._totalActivities.set(response.total);
+        })
+      );
   }
 
   connect() {
     return this.api.get<{ url: string }>('/strava/connect');
   }
 
-  sync() {
+  sync(options?: {
+    daysBack?: number;
+    afterDate?: string;
+    beforeDate?: string;
+  }) {
     this._syncing.set(true);
-    return this.api.post<SyncResult>('/strava/sync', {}).pipe(
+    
+    const params: any = {};
+    if (options?.daysBack !== undefined) params.daysBack = options.daysBack;
+    if (options?.afterDate) params.afterDate = options.afterDate;
+    if (options?.beforeDate) params.beforeDate = options.beforeDate;
+    
+    return this.api.post<SyncResult>('/strava/sync', {}, params).pipe(
       tap({
         next: () => this._syncing.set(false),
         error: () => this._syncing.set(false),
       }),
     );
+  }
+
+  recalculatePaces() {
+    return this.api.post<any>('/strava/recalculate-paces', {});
   }
 
   disconnect() {

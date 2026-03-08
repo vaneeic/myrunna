@@ -10,6 +10,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatMenuModule } from '@angular/material/menu';
 import { AuthService } from '../shared/services/auth.service';
 import { StravaService } from '../shared/services/strava.service';
 import { GoogleCalendarService } from '../shared/services/google-calendar.service';
@@ -30,6 +31,7 @@ import { UsersService } from '../shared/services/users.service';
     MatProgressSpinnerModule,
     MatFormFieldModule,
     MatInputModule,
+    MatMenuModule,
   ],
   template: `
     <div class="p-6 max-w-2xl mx-auto">
@@ -90,20 +92,50 @@ import { UsersService } from '../shared/services/users.service';
             </div>
           </div>
 
-          <!-- Manual sync button -->
-          <button
-            mat-stroked-button
-            (click)="syncNow()"
-            [disabled]="strava.syncing()"
-          >
-            @if (strava.syncing()) {
-              <mat-spinner diameter="16" class="inline-block mr-2"></mat-spinner>
-              Syncing...
-            } @else {
-              <mat-icon>sync</mat-icon>
-              Sync Now
-            }
-          </button>
+          <!-- Manual sync buttons with menu -->
+          <div class="flex gap-2">
+            <button
+              mat-stroked-button
+              (click)="syncNow()"
+              [disabled]="strava.syncing()"
+            >
+              @if (strava.syncing()) {
+                <mat-spinner diameter="16" class="inline-block mr-2"></mat-spinner>
+                Syncing...
+              } @else {
+                <mat-icon>sync</mat-icon>
+                Sync Last Year (365 days)
+              }
+            </button>
+            
+            <button
+              mat-icon-button
+              [matMenuTriggerFor]="syncMenu"
+              [disabled]="strava.syncing()"
+              matTooltip="More sync options"
+            >
+              <mat-icon>more_vert</mat-icon>
+            </button>
+            
+            <mat-menu #syncMenu="matMenu">
+              <button mat-menu-item (click)="syncNow(30)">
+                <mat-icon>today</mat-icon>
+                <span>Last 30 days</span>
+              </button>
+              <button mat-menu-item (click)="syncNow(90)">
+                <mat-icon>date_range</mat-icon>
+                <span>Last 90 days</span>
+              </button>
+              <button mat-menu-item (click)="syncNow(365)">
+                <mat-icon>calendar_month</mat-icon>
+                <span>Last 365 days (Full year)</span>
+              </button>
+              <button mat-menu-item (click)="syncNow(730)">
+                <mat-icon>event_repeat</mat-icon>
+                <span>Last 2 years</span>
+              </button>
+            </mat-menu>
+          </div>
         } @else {
           <!-- Disconnected state -->
           <p class="text-gray-600 mb-4">
@@ -184,12 +216,22 @@ import { UsersService } from '../shared/services/users.service';
                 Save Paces
               }
             </button>
-            <button mat-stroked-button type="button" (click)="loadPaces()" [disabled]="savingPaces()">
+            <button mat-stroked-button type="button" (click)="recalculatePaces()" [disabled]="savingPaces()">
               <mat-icon>refresh</mat-icon>
-              Reset
+              Recalculate from Strava
+            </button>
+            <button mat-stroked-button type="button" (click)="resetForm()" [disabled]="savingPaces()">
+              <mat-icon>undo</mat-icon>
+              Reset Form
             </button>
           </div>
         </form>
+        
+        <p class="text-sm text-gray-500 mt-4">
+          <mat-icon class="text-sm align-middle mr-1" style="font-size:16px;width:16px;height:16px;">info</mat-icon>
+          <strong>Note:</strong> Paces are automatically calculated from your Strava activities during sync. 
+          Click "Recalculate from Strava" to update paces based on your latest runs, or manually adjust them above.
+        </p>
       </mat-card>
 
       <mat-divider class="mb-6"></mat-divider>
@@ -287,6 +329,37 @@ export class SettingsComponent implements OnInit {
     });
   }
 
+  resetForm() {
+    this.loadPaces();
+    this.snackBar.open('Form reset to saved values.', 'Close', {
+      duration: 2000,
+    });
+  }
+
+  recalculatePaces() {
+    this.savingPaces.set(true);
+    this.strava.recalculatePaces().subscribe({
+      next: (updatedPaces) => {
+        this.savingPaces.set(false);
+        // Reload the fresh values into the form
+        this.loadPaces();
+        this.snackBar.open(
+          'Paces recalculated from your Strava activities!',
+          'Close',
+          { duration: 4000 },
+        );
+      },
+      error: () => {
+        this.savingPaces.set(false);
+        this.snackBar.open(
+          'Failed to recalculate paces. Make sure you have Strava activities synced.',
+          'Close',
+          { duration: 5000 },
+        );
+      },
+    });
+  }
+
   savePaces() {
     if (this.paceForm.invalid) {
       this.snackBar.open('Please enter valid pace values in MM:SS format.', 'Close', {
@@ -342,13 +415,18 @@ export class SettingsComponent implements OnInit {
     });
   }
 
-  syncNow() {
-    this.strava.sync().subscribe({
+  syncNow(daysBack?: number) {
+    const syncOptions = daysBack ? { daysBack } : undefined;
+    const daysLabel = daysBack 
+      ? `last ${daysBack} days` 
+      : 'last year (365 days)';
+    
+    this.strava.sync(syncOptions).subscribe({
       next: (result) => {
         this.snackBar.open(
-          `Sync complete: ${result.imported} new, ${result.updated} updated`,
+          `Sync complete (${daysLabel}): ${result.imported} new, ${result.updated} updated`,
           'Close',
-          { duration: 4000 },
+          { duration: 5000 },
         );
         // Refresh status to show the updated lastSyncedAt
         this.strava.loadStatus().subscribe({ error: () => {} });
