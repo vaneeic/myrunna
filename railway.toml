@@ -1,0 +1,19 @@
+[build]
+builder = "nixpacks"
+
+# ============================================================
+# MyRunna — Railway deployment configuration
+# Two services: backend (NestJS) + frontend (Angular static)
+# PostgreSQL is added as a Railway plugin (no config needed here)
+# ============================================================
+
+# Note: in Railway dashboard, create two services:
+# 1. "backend" — set root directory to /backend
+# 2. "frontend" — set root directory to /frontend
+#    and configure as static site with output dir /dist/frontend/browser
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

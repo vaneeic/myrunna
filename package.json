@@ -1,0 +1,23 @@
+{
+  "name": "myrunna",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MyRunna — Personal running plan management app",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
+  "scripts": {
+    "dev:backend": "npm run start:dev --workspace=backend",
+    "dev:frontend": "npm run start --workspace=frontend",
+    "build:backend": "npm run build --workspace=backend",
+    "build:frontend": "npm run build --workspace=frontend",
+    "migrate": "npm run db:migrate --workspace=backend",
+    "migrate:generate": "npm run db:generate --workspace=backend"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

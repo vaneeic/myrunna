@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+build/
+**/dist/
+**/build/
+
+# Environment files — NEVER commit these
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Angular
+frontend/.angular/
+frontend/coverage/
+
+# NestJS
+backend/coverage/
+
+# Docker volumes
+postgres_data/
+
+# TypeScript
+*.tsbuildinfo
+
+# Drizzle generated (keep migrations, ignore snapshots)
+backend/src/db/migrations/meta/
+
+# Claude Code local settings (keep agent-memory, exclude local config)
+.claude/settings.local.json
