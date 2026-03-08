@@ -22,4 +22,11 @@ export const PLANS_ROUTES: Routes = [
         (m) => m.PlanDetailComponent,
       ),
   },
+  {
+    path: ':id/calendar',
+    loadComponent: () =>
+      import('./plan-calendar/plan-calendar.component').then(
+        (m) => m.PlanCalendarComponent,
+      ),
+  },
 ];
