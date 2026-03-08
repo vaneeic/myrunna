@@ -173,78 +173,149 @@ export class StravaService {
 
   /**
    * Syncs Strava activities for a user.
-   * Uses `daysBack` for initial/manual syncs.
-   * For nightly cron, pass `sinceTimestamp` to only fetch new activities.
+   * @param userId - User ID to sync activities for
+   * @param options - Optional sync configuration
+   * @param options.daysBack - Number of days to look back (default 365 for historical import)
+   * @param options.afterDate - Optional start date (ISO string or Date)
+   * @param options.beforeDate - Optional end date (ISO string or Date)
+   * @param options.sinceTimestamp - Optional Unix timestamp for incremental sync
    */
   async syncActivities(
     userId: string,
-    daysBack = 90,
-    sinceTimestamp?: number,
+    options?: {
+      daysBack?: number;
+      afterDate?: string | Date;
+      beforeDate?: string | Date;
+      sinceTimestamp?: number;
+    },
   ): Promise<{ imported: number; updated: number }> {
     const accessToken = await this.getValidAccessToken(userId);
 
-    // If we have a lastSyncedAt, use that; otherwise fall back to daysBack
-    const after =
-      sinceTimestamp ??
-      Math.floor(Date.now() / 1000) - daysBack * 86400;
+    // Determine the time range for the sync
+    let after: number;
+    let before: number | undefined;
+
+    if (options?.sinceTimestamp) {
+      // Incremental sync using last sync timestamp
+      after = options.sinceTimestamp;
+    } else if (options?.afterDate) {
+      // Custom date range
+      const afterDateObj = typeof options.afterDate === 'string' 
+        ? new Date(options.afterDate) 
+        : options.afterDate;
+      after = Math.floor(afterDateObj.getTime() / 1000);
+    } else {
+      // Default: look back 365 days for historical import
+      const daysBack = options?.daysBack ?? 365;
+      after = Math.floor(Date.now() / 1000) - daysBack * 86400;
+    }
+
+    if (options?.beforeDate) {
+      const beforeDateObj = typeof options.beforeDate === 'string'
+        ? new Date(options.beforeDate)
+        : options.beforeDate;
+      before = Math.floor(beforeDateObj.getTime() / 1000);
+    }
 
     let page = 1;
     let imported = 0;
     let updated = 0;
+    let totalProcessed = 0;
+
+    this.logger.log(
+      `Starting Strava sync for user ${userId} from ${new Date(after * 1000).toISOString()}` +
+      (before ? ` to ${new Date(before * 1000).toISOString()}` : ''),
+    );
 
     // Strava max 200 per page; keep paginating until empty page returned
     while (true) {
-      const response = await firstValueFrom(
-        this.httpService.get(`${STRAVA_API_BASE}/athlete/activities`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-          params: { after, per_page: 200, page },
-        }),
-      );
-
-      const activities: any[] = response.data;
-      if (!activities.length) break;
-
-      for (const act of activities) {
-        // Only sync running activity types
-        if (!act.type.toLowerCase().includes('run')) continue;
-
-        const values = {
-          userId,
-          stravaId: String(act.id),
-          name: act.name,
-          type: act.type,
-          distance: act.distance,
-          movingTime: act.moving_time,
-          elapsedTime: act.elapsed_time,
-          startDate: new Date(act.start_date),
-          averageHeartrate: act.average_heartrate ?? null,
-          maxHeartrate: act.max_heartrate ?? null,
-          averageCadence: act.average_cadence ?? null,
-          sufferScore: act.suffer_score ?? null,
-          rawJson: act,
+      try {
+        const params: any = { 
+          after, 
+          per_page: 200, 
+          page 
         };
-
-        const existing = await this.db
-          .select({ id: stravaActivities.id })
-          .from(stravaActivities)
-          .where(eq(stravaActivities.stravaId, values.stravaId))
-          .limit(1);
-
-        if (existing.length) {
-          await this.db
-            .update(stravaActivities)
-            .set(values)
-            .where(eq(stravaActivities.stravaId, values.stravaId));
-          updated++;
-        } else {
-          await this.db.insert(stravaActivities).values(values);
-          imported++;
+        
+        if (before) {
+          params.before = before;
         }
-      }
 
-      // If fewer than 200 returned, we're on the last page
-      if (activities.length < 200) break;
-      page++;
+        const response = await firstValueFrom(
+          this.httpService.get(`${STRAVA_API_BASE}/athlete/activities`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            params,
+          }),
+        );
+
+        const activities: any[] = response.data;
+        if (!activities.length) break;
+
+        totalProcessed += activities.length;
+
+        for (const act of activities) {
+          // Only sync running activity types
+          if (!act.type.toLowerCase().includes('run')) continue;
+
+          const values = {
+            userId,
+            stravaId: String(act.id),
+            name: act.name,
+            type: act.type,
+            distance: act.distance,
+            movingTime: act.moving_time,
+            elapsedTime: act.elapsed_time,
+            startDate: new Date(act.start_date),
+            averageHeartrate: act.average_heartrate ?? null,
+            maxHeartrate: act.max_heartrate ?? null,
+            averageCadence: act.average_cadence ?? null,
+            sufferScore: act.suffer_score ?? null,
+            rawJson: act,
+          };
+
+          const existing = await this.db
+            .select({ id: stravaActivities.id })
+            .from(stravaActivities)
+            .where(eq(stravaActivities.stravaId, values.stravaId))
+            .limit(1);
+
+          if (existing.length) {
+            await this.db
+              .update(stravaActivities)
+              .set(values)
+              .where(eq(stravaActivities.stravaId, values.stravaId));
+            updated++;
+          } else {
+            await this.db.insert(stravaActivities).values(values);
+            imported++;
+          }
+        }
+
+        // If fewer than 200 returned, we're on the last page
+        if (activities.length < 200) break;
+        
+        page++;
+        
+        // Rate limiting: add a small delay between pages to respect Strava's rate limits
+        // Strava allows 100 requests per 15 minutes (1 request per 9 seconds on average)
+        if (page % 10 === 0) {
+          this.logger.log(
+            `Processed ${totalProcessed} activities (page ${page}), brief pause for rate limiting...`,
+          );
+          await this.sleep(2000); // 2 second pause every 10 pages
+        }
+      } catch (err: any) {
+        // Handle rate limiting errors
+        if (err.response?.status === 429) {
+          const retryAfter = parseInt(err.response.headers['retry-after'] || '60', 10);
+          this.logger.warn(
+            `Rate limit hit, waiting ${retryAfter} seconds before retry...`,
+          );
+          await this.sleep(retryAfter * 1000);
+          // Retry the same page
+          continue;
+        }
+        throw err;
+      }
     }
 
     // Record the sync time so the next nightly sync can use it
@@ -254,9 +325,18 @@ export class StravaService {
     await this.updateUserPacesByDistance(userId);
 
     this.logger.log(
-      `Strava sync for user ${userId}: +${imported} imported, ${updated} updated`,
+      `Strava sync completed for user ${userId}: ` +
+      `${totalProcessed} activities processed, ` +
+      `+${imported} imported, ${updated} updated`,
     );
     return { imported, updated };
+  }
+
+  /**
+   * Helper method to sleep for a specified duration
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
@@ -368,9 +448,12 @@ export class StravaService {
         // Use lastSyncedAt if available, otherwise fall back to 1 day back
         const sinceTimestamp = tokens.lastSyncedAt
           ? Math.floor(tokens.lastSyncedAt.getTime() / 1000)
-          : Math.floor(Date.now() / 1000) - 86400;
+          : undefined;
 
-        await this.syncActivities(userId, 1, sinceTimestamp);
+        await this.syncActivities(userId, {
+          sinceTimestamp,
+          daysBack: sinceTimestamp ? undefined : 1,
+        });
       } catch (err) {
         // Log but don't fail the whole batch if one user errors
         this.logger.error(`Nightly sync failed for user ${userId}`, err);
