@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
-import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -132,38 +132,50 @@ import { UsersService } from '../shared/services/users.service';
         </h2>
         <p class="text-sm text-gray-600 mb-4">
           Set your target paces for different distances. These are automatically calculated from your Strava activities but can be manually adjusted.
-          Format: decimal minutes per km (e.g., 5:30/km = 5.5)
+          Format: MM:SS per km (e.g., 5:30/km)
         </p>
 
         <form [formGroup]="paceForm" (ngSubmit)="savePaces()" class="space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <mat-form-field appearance="outline" class="w-full">
               <mat-label>5K Pace (min/km)</mat-label>
-              <input matInput type="number" step="0.05" formControlName="pace5k" placeholder="4.5">
-              <mat-hint>e.g., 4:30/km = 4.5</mat-hint>
+              <input matInput type="text" formControlName="pace5k" placeholder="4:30" pattern="[0-9]+:[0-5][0-9]">
+              <mat-hint>e.g., 4:30/km</mat-hint>
+              @if (paceForm.get('pace5k')?.hasError('pattern') && paceForm.get('pace5k')?.touched) {
+                <mat-error>Use MM:SS format (e.g., 4:30)</mat-error>
+              }
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="w-full">
               <mat-label>10K Pace (min/km)</mat-label>
-              <input matInput type="number" step="0.05" formControlName="pace10k" placeholder="5.0">
-              <mat-hint>e.g., 5:00/km = 5.0</mat-hint>
+              <input matInput type="text" formControlName="pace10k" placeholder="5:00" pattern="[0-9]+:[0-5][0-9]">
+              <mat-hint>e.g., 5:00/km</mat-hint>
+              @if (paceForm.get('pace10k')?.hasError('pattern') && paceForm.get('pace10k')?.touched) {
+                <mat-error>Use MM:SS format (e.g., 5:00)</mat-error>
+              }
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="w-full">
               <mat-label>15K Pace (min/km)</mat-label>
-              <input matInput type="number" step="0.05" formControlName="pace15k" placeholder="5.25">
-              <mat-hint>e.g., 5:15/km = 5.25</mat-hint>
+              <input matInput type="text" formControlName="pace15k" placeholder="5:15" pattern="[0-9]+:[0-5][0-9]">
+              <mat-hint>e.g., 5:15/km</mat-hint>
+              @if (paceForm.get('pace15k')?.hasError('pattern') && paceForm.get('pace15k')?.touched) {
+                <mat-error>Use MM:SS format (e.g., 5:15)</mat-error>
+              }
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="w-full">
               <mat-label>Half Marathon Pace (min/km)</mat-label>
-              <input matInput type="number" step="0.05" formControlName="paceHM" placeholder="5.5">
-              <mat-hint>e.g., 5:30/km = 5.5</mat-hint>
+              <input matInput type="text" formControlName="paceHM" placeholder="5:30" pattern="[0-9]+:[0-5][0-9]">
+              <mat-hint>e.g., 5:30/km</mat-hint>
+              @if (paceForm.get('paceHM')?.hasError('pattern') && paceForm.get('paceHM')?.touched) {
+                <mat-error>Use MM:SS format (e.g., 5:30)</mat-error>
+              }
             </mat-form-field>
           </div>
 
           <div class="flex gap-2">
-            <button mat-raised-button color="primary" type="submit" [disabled]="savingPaces()">
+            <button mat-raised-button color="primary" type="submit" [disabled]="savingPaces() || paceForm.invalid">
               @if (savingPaces()) {
                 <mat-spinner diameter="16" class="inline-block mr-2"></mat-spinner>
                 Saving...
@@ -204,11 +216,33 @@ export class SettingsComponent implements OnInit {
 
   constructor() {
     this.paceForm = this.fb.group({
-      pace5k: [null],
-      pace10k: [null],
-      pace15k: [null],
-      paceHM: [null],
+      pace5k: [null, Validators.pattern(/^[0-9]+:[0-5][0-9]$/)],
+      pace10k: [null, Validators.pattern(/^[0-9]+:[0-5][0-9]$/)],
+      pace15k: [null, Validators.pattern(/^[0-9]+:[0-5][0-9]$/)],
+      paceHM: [null, Validators.pattern(/^[0-9]+:[0-5][0-9]$/)],
     });
+  }
+
+  /**
+   * Convert decimal pace (e.g., 5.5) to MM:SS format (e.g., "5:30")
+   */
+  private decimalToTime(decimal: number | null | undefined): string {
+    if (decimal === null || decimal === undefined) return '';
+    const minutes = Math.floor(decimal);
+    const seconds = Math.round((decimal - minutes) * 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Convert MM:SS format (e.g., "5:30") to decimal pace (e.g., 5.5)
+   */
+  private timeToDecimal(time: string | null): number | undefined {
+    if (!time) return undefined;
+    const match = time.match(/^(\d+):([0-5]\d)$/);
+    if (!match) return undefined;
+    const minutes = parseInt(match[1], 10);
+    const seconds = parseInt(match[2], 10);
+    return minutes + seconds / 60;
   }
 
   ngOnInit() {
@@ -239,10 +273,10 @@ export class SettingsComponent implements OnInit {
     this.usersService.getMe().subscribe({
       next: (user) => {
         this.paceForm.patchValue({
-          pace5k: user.pace5kMinPerKm,
-          pace10k: user.pace10kMinPerKm,
-          pace15k: user.pace15kMinPerKm,
-          paceHM: user.paceHalfMarathonMinPerKm,
+          pace5k: this.decimalToTime(user.pace5kMinPerKm),
+          pace10k: this.decimalToTime(user.pace10kMinPerKm),
+          pace15k: this.decimalToTime(user.pace15kMinPerKm),
+          paceHM: this.decimalToTime(user.paceHalfMarathonMinPerKm),
         });
       },
       error: () => {
@@ -254,14 +288,21 @@ export class SettingsComponent implements OnInit {
   }
 
   savePaces() {
+    if (this.paceForm.invalid) {
+      this.snackBar.open('Please enter valid pace values in MM:SS format.', 'Close', {
+        duration: 4000,
+      });
+      return;
+    }
+
     this.savingPaces.set(true);
     const formValue = this.paceForm.value;
     
     this.usersService.updatePaces({
-      pace5kMinPerKm: formValue.pace5k,
-      pace10kMinPerKm: formValue.pace10k,
-      pace15kMinPerKm: formValue.pace15k,
-      paceHalfMarathonMinPerKm: formValue.paceHM,
+      pace5kMinPerKm: this.timeToDecimal(formValue.pace5k),
+      pace10kMinPerKm: this.timeToDecimal(formValue.pace10k),
+      pace15kMinPerKm: this.timeToDecimal(formValue.pace15k),
+      paceHalfMarathonMinPerKm: this.timeToDecimal(formValue.paceHM),
     }).subscribe({
       next: () => {
         this.savingPaces.set(false);
