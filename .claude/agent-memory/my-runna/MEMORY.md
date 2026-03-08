@@ -17,7 +17,7 @@ GitHub repo: https://github.com/vaneeic/myrunna (SSH: git@github.com:vaneeic/myr
 - DB schema: `backend/src/db/schema/` (users.ts, strava.ts, training-plans.ts)
 - Migration SQL: `backend/src/db/migrations/0001_initial_schema.sql`
 - Frontend routes: `frontend/src/app/app.routes.ts`
-- Shared types: `shared/src/types/`
+- Plans service: `frontend/src/app/shared/services/plans.service.ts`
 - Env template: `.env.example` (copy to `backend/.env` for local dev)
 
 ## Architecture Decisions
@@ -26,19 +26,27 @@ GitHub repo: https://github.com/vaneeic/myrunna (SSH: git@github.com:vaneeic/myr
 - AllExceptionsFilter registered globally in main.ts
 - Angular uses functional guards (authGuard) and functional interceptors (authInterceptor)
 - Drizzle `inArray` used for batch session fetches (not subqueries)
+- Drizzle `innerJoin` is a query-builder method — NOT a named import from drizzle-orm
 
-## Phase Status (as of Phase 1 commit)
+## Phase Status (as of Phase 3 commit)
 - Phase 1: Complete (scaffold, schema, auth, strava base, frontend base)
 - Phase 2: Strava OAuth + sync scaffolded; nightly cron + webhooks TODO
-- Phase 3: Plan generation logic built; B/C race taper + session editing TODO
+- Phase 3: Complete — full CRUD, session update endpoint, CDK drag-and-drop, signal state
 - Phase 4: Calendar .ics export — NOT started
-- Phase 5: Frontend pages scaffolded; Gantt view + drag-and-drop TODO
+- Phase 5: Drag-and-drop done in Phase 3; Gantt/calendar view TODO
+
+## Plans Feature (Phase 3)
+- `PlansService` — signal-based; `plans`, `loading`, `activePlan` signals exposed
+- `SESSION_TYPE_CONFIG` map exported from plans.service for colour-coded session badges
+- `updateSession` endpoint: `PATCH /api/training-plans/:id/sessions/:sessionId`
+- `UpdateSessionDto` at `backend/src/training-plans/dto/update-session.dto.ts`
+- CDK DragDropModule used for session reordering — import from `@angular/cdk/drag-drop`
+- Plan detail: optimistic UI updates with rollback on API error
+- `groupSessionsByWeek()` returns `Map<string, TrainingSession[]>` sorted by date
 
 ## Common Pitfalls
-- `tsconfig.json` uses `module: nodenext` — imports need file extensions in some cases
+- `tsconfig.json` uses `module: nodenext` — imports may need file extensions
 - Angular Material + Tailwind: `preflight: false` in tailwind.config.js to avoid style conflicts
 - Strava token refresh: always check `isTokenExpired()` with 5min buffer before API calls
-- `findOne` for training plans uses `inArray(trainingSessions.weekId, weekIds)` — not eq on first week only
-
-## See Also
-- `patterns.md` — (to be created as patterns emerge)
+- CDK drag-and-drop: import `DragDropModule` (not from @angular/material)
+- `window.confirm()` is fine for simple delete confirmations — no MatDialog needed

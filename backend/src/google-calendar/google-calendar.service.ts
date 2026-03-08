@@ -1,0 +1,511 @@
+/**
+ * GoogleCalendarService
+ *
+ * Manages Google Calendar OAuth2 flow, token lifecycle, and calendar event
+ * CRUD for MyRunna training sessions.
+ *
+ * Google Calendar colour IDs:
+ *   2  = Sage (green)    5  = Tomato (red)     6  = Tangerine (orange)
+ *   7  = Peacock (teal)  9  = Banana (yellow)  10 = Sage (light)
+ *   11 = Graphite (grey)
+ *
+ * Session type → colour mapping:
+ *   long_run  → 2  easy_run  → 7  tempo     → 5
+ *   intervals → 9  recovery  → 10 race      → 6  rest → 11
+ */
+import {
+  Injectable,
+  Logger,
+  UnauthorizedException,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Inject } from '@nestjs/common';
+import { eq, and, inArray } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { google } from 'googleapis';
+import type { calendar_v3 } from 'googleapis';
+import { GoogleCalendarTokenService } from './google-calendar-token.service';
+import { DATABASE_CONNECTION } from '../db/database.module';
+import {
+  trainingPlans,
+  trainingWeeks,
+  trainingSessions,
+} from '../db/schema';
+import type { TrainingSession } from '../db/schema';
+import * as schema from '../db/schema';
+
+const CALENDAR_NAME = 'MyRunna';
+
+/** Extended property keys stored on every event so we can find/update them */
+const KEY_SESSION_ID = 'myrunnaSessionId';
+const KEY_PLAN_ID = 'myrunnaPlanId';
+
+const SESSION_COLOUR: Record<string, string> = {
+  long_run: '2',
+  tempo: '5',
+  intervals: '9',
+  easy_run: '7',
+  recovery: '10',
+  race: '6',
+  rest: '11',
+};
+
+const SESSION_LABEL: Record<string, string> = {
+  easy_run: 'Easy Run',
+  long_run: 'Long Run',
+  tempo: 'Tempo',
+  intervals: 'Intervals',
+  recovery: 'Recovery',
+  race: 'Race',
+  rest: 'Rest',
+};
+
+@Injectable()
+export class GoogleCalendarService {
+  private readonly logger = new Logger(GoogleCalendarService.name);
+
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly tokenService: GoogleCalendarTokenService,
+    @Inject(DATABASE_CONNECTION)
+    private readonly db: NodePgDatabase<typeof schema>,
+  ) {}
+
+  // ---------------------------------------------------------------------------
+  // OAuth helpers
+  // ---------------------------------------------------------------------------
+
+  private createOAuth2Client() {
+    return new google.auth.OAuth2(
+      this.configService.get<string>('GOOGLE_CLIENT_ID'),
+      this.configService.get<string>('GOOGLE_CLIENT_SECRET'),
+      this.configService.get<string>('GOOGLE_REDIRECT_URI'),
+    );
+  }
+
+  getAuthorizationUrl(userId: string): string {
+    const oauth2Client = this.createOAuth2Client();
+    return oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      // Force consent so we always receive a refresh token
+      prompt: 'consent',
+      scope: ['https://www.googleapis.com/auth/calendar'],
+      state: userId,
+    });
+  }
+
+  async connectUser(userId: string, code: string): Promise<void> {
+    const oauth2Client = this.createOAuth2Client();
+
+    let tokens: {
+      access_token?: string | null;
+      refresh_token?: string | null;
+      expiry_date?: number | null;
+    };
+
+    try {
+      const response = await oauth2Client.getToken(code);
+      tokens = response.tokens;
+    } catch (err) {
+      this.logger.error('Failed to exchange Google auth code for tokens', err);
+      throw new BadRequestException('Failed to connect Google Calendar');
+    }
+
+    if (!tokens.access_token || !tokens.refresh_token) {
+      throw new BadRequestException(
+        'Google did not return required tokens — ensure offline access was granted',
+      );
+    }
+
+    oauth2Client.setCredentials(tokens);
+    const calendarId = await this.createMyRunnaCalendar(oauth2Client);
+
+    const expiresAt = tokens.expiry_date
+      ? new Date(tokens.expiry_date)
+      : new Date(Date.now() + 3600 * 1000);
+
+    await this.tokenService.saveCredentials(userId, {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      expiresAt,
+      calendarId,
+    });
+
+    this.logger.log(
+      `Google Calendar connected for user ${userId}, calendarId=${calendarId}`,
+    );
+  }
+
+  private async createMyRunnaCalendar(
+    oauth2Client: ReturnType<typeof this.createOAuth2Client>,
+  ): Promise<string> {
+    const calendarApi = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    // Avoid duplicates: check if a MyRunna calendar already exists
+    const { data: list } = await calendarApi.calendarList.list();
+    const existing = list.items?.find((c) => c.summary === CALENDAR_NAME);
+    if (existing?.id) {
+      this.logger.log(`Re-using existing ${CALENDAR_NAME} calendar: ${existing.id}`);
+      return existing.id;
+    }
+
+    const { data: created } = await calendarApi.calendars.insert({
+      requestBody: {
+        summary: CALENDAR_NAME,
+        description: 'Training sessions generated by MyRunna',
+        timeZone: 'UTC',
+      },
+    });
+
+    if (!created.id) {
+      throw new BadRequestException('Failed to create MyRunna calendar in Google Calendar');
+    }
+
+    return created.id;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Token refresh
+  // ---------------------------------------------------------------------------
+
+  async ensureFreshToken(
+    userId: string,
+  ): Promise<ReturnType<typeof this.createOAuth2Client>> {
+    const creds = await this.tokenService.getDecryptedCredentials(userId);
+    if (!creds) {
+      throw new UnauthorizedException('Google Calendar not connected');
+    }
+
+    const oauth2Client = this.createOAuth2Client();
+    oauth2Client.setCredentials({
+      access_token: creds.accessToken,
+      refresh_token: creds.refreshToken,
+      expiry_date: creds.tokenExpiresAt.getTime(),
+    });
+
+    if (this.tokenService.isTokenExpired(creds.tokenExpiresAt)) {
+      this.logger.log(`Refreshing Google token for user ${userId}`);
+      try {
+        const { credentials } = await oauth2Client.refreshAccessToken();
+        await this.tokenService.updateTokens(userId, {
+          accessToken: credentials.access_token!,
+          refreshToken: credentials.refresh_token ?? undefined,
+          expiresAt: credentials.expiry_date
+            ? new Date(credentials.expiry_date)
+            : new Date(Date.now() + 3600 * 1000),
+        });
+        oauth2Client.setCredentials(credentials);
+      } catch (err) {
+        this.logger.error(`Failed to refresh Google token for user ${userId}`, err);
+        throw new UnauthorizedException(
+          'Google token refresh failed — please reconnect',
+        );
+      }
+    }
+
+    return oauth2Client;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Status & disconnect
+  // ---------------------------------------------------------------------------
+
+  async getConnectionStatus(userId: string) {
+    const creds = await this.tokenService.getDecryptedCredentials(userId);
+    if (!creds) return { connected: false };
+    return {
+      connected: true,
+      calendarName: CALENDAR_NAME,
+      calendarId: creds.calendarId,
+      lastSyncedAt: creds.lastSyncedAt,
+    };
+  }
+
+  async disconnect(userId: string): Promise<void> {
+    const creds = await this.tokenService.getDecryptedCredentials(userId);
+    if (!creds) return;
+
+    // Best-effort revoke the access token with Google
+    try {
+      const oauth2Client = this.createOAuth2Client();
+      oauth2Client.setCredentials({
+        access_token: creds.accessToken,
+        refresh_token: creds.refreshToken,
+      });
+      await oauth2Client.revokeToken(creds.accessToken);
+    } catch (err) {
+      // Non-fatal — token may already be expired
+      this.logger.warn(
+        `Could not revoke Google token for user ${userId}: ${(err as Error).message}`,
+      );
+    }
+
+    // Best-effort delete the MyRunna calendar
+    try {
+      const oauth2Client = await this.ensureFreshToken(userId).catch(() => null);
+      if (oauth2Client) {
+        const calendarApi = google.calendar({ version: 'v3', auth: oauth2Client });
+        await calendarApi.calendars.delete({ calendarId: creds.calendarId });
+        this.logger.log(
+          `Deleted MyRunna calendar ${creds.calendarId} for user ${userId}`,
+        );
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Could not delete MyRunna calendar for user ${userId}: ${(err as Error).message}`,
+      );
+    }
+
+    await this.tokenService.deleteCredentials(userId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Event sync
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Sync all sessions for a training plan to Google Calendar.
+   * Creates or updates one event per session.
+   */
+  async syncPlanToCalendar(userId: string, planId: string): Promise<void> {
+    const creds = await this.tokenService.getDecryptedCredentials(userId);
+    if (!creds) return; // Google not connected — silently skip
+
+    const plan = await this.db
+      .select()
+      .from(trainingPlans)
+      .where(and(eq(trainingPlans.id, planId), eq(trainingPlans.userId, userId)))
+      .limit(1);
+
+    if (!plan[0]) throw new NotFoundException('Training plan not found');
+
+    const weeks = await this.db
+      .select()
+      .from(trainingWeeks)
+      .where(eq(trainingWeeks.planId, planId));
+
+    const weekIds = weeks.map((w) => w.id);
+    if (!weekIds.length) return;
+
+    const sessions = await this.db
+      .select()
+      .from(trainingSessions)
+      .where(inArray(trainingSessions.weekId, weekIds));
+
+    const oauth2Client = await this.ensureFreshToken(userId);
+    const calendarApi = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    let count = 0;
+    for (const session of sessions) {
+      try {
+        await this.upsertSessionEvent(
+          calendarApi,
+          creds.calendarId,
+          session,
+          plan[0].name,
+          planId,
+        );
+        count++;
+      } catch (err) {
+        this.logger.error(`Failed to create event for session ${session.id}`, err);
+      }
+    }
+
+    await this.tokenService.updateLastSyncedAt(userId);
+    this.logger.log(
+      `Synced plan ${planId} to Google Calendar for user ${userId}: ${count} events`,
+    );
+  }
+
+  /**
+   * Update or create the Google Calendar event for a single session.
+   * Pass the planId so extended properties are set correctly.
+   */
+  async updateSession(
+    userId: string,
+    sessionId: string,
+    planId: string,
+  ): Promise<void> {
+    const creds = await this.tokenService.getDecryptedCredentials(userId);
+    if (!creds) return;
+
+    const plan = await this.db
+      .select()
+      .from(trainingPlans)
+      .where(eq(trainingPlans.id, planId))
+      .limit(1);
+
+    if (!plan[0]) return;
+
+    const sessionRows = await this.db
+      .select()
+      .from(trainingSessions)
+      .where(eq(trainingSessions.id, sessionId))
+      .limit(1);
+
+    if (!sessionRows[0]) return;
+
+    const oauth2Client = await this.ensureFreshToken(userId);
+    const calendarApi = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    await this.upsertSessionEvent(
+      calendarApi,
+      creds.calendarId,
+      sessionRows[0],
+      plan[0].name,
+      planId,
+    );
+  }
+
+  /**
+   * Delete all Google Calendar events belonging to a plan.
+   * Called before the plan is deleted from the DB.
+   */
+  async deletePlanEvents(userId: string, planId: string): Promise<void> {
+    const creds = await this.tokenService.getDecryptedCredentials(userId);
+    if (!creds) return;
+
+    const oauth2Client = await this.ensureFreshToken(userId).catch(() => null);
+    if (!oauth2Client) return;
+
+    const calendarApi = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    try {
+      let pageToken: string | undefined;
+      let deleted = 0;
+
+      do {
+        const response = await calendarApi.events.list({
+          calendarId: creds.calendarId,
+          privateExtendedProperty: `${KEY_PLAN_ID}=${planId}`,
+          maxResults: 250,
+          pageToken,
+        });
+
+        const events = response.data.items ?? [];
+        for (const event of events) {
+          if (event.id) {
+            await calendarApi.events
+              .delete({ calendarId: creds.calendarId, eventId: event.id })
+              .catch((err) => {
+                this.logger.warn(
+                  `Failed to delete event ${event.id}: ${(err as Error).message}`,
+                );
+              });
+            deleted++;
+          }
+        }
+
+        pageToken = response.data.nextPageToken ?? undefined;
+      } while (pageToken);
+
+      this.logger.log(
+        `Deleted ${deleted} Google Calendar events for plan ${planId}, user ${userId}`,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Error deleting plan events for plan ${planId}`,
+        err,
+      );
+    }
+  }
+
+  /**
+   * Delete a single calendar event by its Google event ID.
+   */
+  async deleteSessionEvent(userId: string, googleEventId: string): Promise<void> {
+    const creds = await this.tokenService.getDecryptedCredentials(userId);
+    if (!creds) return;
+
+    const oauth2Client = await this.ensureFreshToken(userId).catch(() => null);
+    if (!oauth2Client) return;
+
+    const calendarApi = google.calendar({ version: 'v3', auth: oauth2Client });
+    await calendarApi.events
+      .delete({ calendarId: creds.calendarId, eventId: googleEventId })
+      .catch((err) => {
+        this.logger.warn(
+          `Failed to delete event ${googleEventId}: ${(err as Error).message}`,
+        );
+      });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  private buildEventTitle(session: TrainingSession, planName: string): string {
+    const label = SESSION_LABEL[session.sessionType] ?? session.sessionType;
+    const emoji = session.completed ? '\u2705' : '\uD83C\uDFC3';
+    return `${emoji} ${label} - ${planName}`;
+  }
+
+  private buildEventDescription(session: TrainingSession): string {
+    const parts: string[] = [];
+    if (session.plannedDistanceKm) {
+      parts.push(`Distance: ${session.plannedDistanceKm} km`);
+    }
+    if (session.plannedDurationMin) {
+      parts.push(`Duration: ${session.plannedDurationMin} min`);
+    }
+    if (session.description) {
+      parts.push('');
+      parts.push(session.description);
+    }
+    parts.push('');
+    parts.push('Generated by MyRunna');
+    return parts.join('\n');
+  }
+
+  /**
+   * Find an existing Google event for this session (via extended properties)
+   * and update it; create a new event if none exists.
+   */
+  private async upsertSessionEvent(
+    calendarApi: calendar_v3.Calendar,
+    calendarId: string,
+    session: TrainingSession,
+    planName: string,
+    planId: string,
+  ): Promise<void> {
+    const existing = await calendarApi.events
+      .list({
+        calendarId,
+        privateExtendedProperty: `${KEY_SESSION_ID}=${session.id}`,
+        maxResults: 1,
+      })
+      .catch(() => null);
+
+    const existingEvent = existing?.data?.items?.[0];
+
+    const requestBody: calendar_v3.Schema$Event = {
+      summary: this.buildEventTitle(session, planName),
+      description: this.buildEventDescription(session),
+      // All-day event — use date strings, not dateTime
+      start: { date: session.date },
+      end: { date: session.date },
+      colorId: SESSION_COLOUR[session.sessionType] ?? '7',
+      extendedProperties: {
+        private: {
+          [KEY_SESSION_ID]: session.id,
+          [KEY_PLAN_ID]: planId,
+        },
+      },
+    };
+
+    if (existingEvent?.id) {
+      await calendarApi.events.update({
+        calendarId,
+        eventId: existingEvent.id,
+        requestBody,
+      });
+    } else {
+      await calendarApi.events.insert({
+        calendarId,
+        requestBody,
+      });
+    }
+  }
+}

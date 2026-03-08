@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { StravaModule } from './strava/strava.module';
 import { TrainingPlansModule } from './training-plans/training-plans.module';
 import { HealthModule } from './health/health.module';
+import { GoogleCalendarModule } from './google-calendar/google-calendar.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { HealthModule } from './health/health.module';
     StravaModule,
     TrainingPlansModule,
     HealthModule,
+    GoogleCalendarModule,
   ],
   controllers: [AppController],
   providers: [],

@@ -45,6 +45,7 @@
     "drizzle-kit": "^0.31.9",
     "drizzle-orm": "^0.45.1",
     "express-rate-limit": "^8.3.0",
+    "googleapis": "^171.4.0",
     "helmet": "^8.1.0",
     "node-cron": "^4.2.1",
     "passport": "^0.7.0",

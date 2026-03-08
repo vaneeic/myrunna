@@ -11,6 +11,7 @@ import {
   Injectable,
   Inject,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { eq, and, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -27,6 +28,7 @@ import {
 import * as schema from '../db/schema';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdateSessionDto } from './dto/update-session.dto';
+import { GoogleCalendarService } from '../google-calendar/google-calendar.service';
 
 type SessionType =
   | 'easy_run'
@@ -39,9 +41,12 @@ type SessionType =
 
 @Injectable()
 export class TrainingPlansService {
+  private readonly logger = new Logger(TrainingPlansService.name);
+
   constructor(
     @Inject(DATABASE_CONNECTION)
     private readonly db: NodePgDatabase<typeof schema>,
+    private readonly googleCalendarService: GoogleCalendarService,
   ) {}
 
   async findAllForUser(userId: string) {
@@ -107,6 +112,11 @@ export class TrainingPlansService {
 
     // Generate weeks with progressive overload
     await this.generateWeeks(plan.id, totalWeeks, dto.currentWeeklyVolumeKm, today);
+
+    // Sync to Google Calendar if the user has it connected (fire-and-forget)
+    this.googleCalendarService.syncPlanToCalendar(userId, plan.id).catch((err) => {
+      this.logger.error(`Google Calendar sync failed for plan ${plan.id}`, err);
+    });
 
     return plan;
   }
@@ -244,6 +254,11 @@ export class TrainingPlansService {
 
     if (!plan[0]) throw new NotFoundException('Training plan not found');
 
+    // Delete Google Calendar events before removing from DB (fire-and-forget)
+    this.googleCalendarService.deletePlanEvents(userId, planId).catch((err) => {
+      this.logger.error(`Google Calendar cleanup failed for plan ${planId}`, err);
+    });
+
     await this.db
       .delete(trainingPlans)
       .where(eq(trainingPlans.id, planId));
@@ -297,6 +312,14 @@ export class TrainingPlansService {
       .set(updateData)
       .where(eq(trainingSessions.id, sessionId))
       .returning();
+
+    // Update the Google Calendar event (fire-and-forget)
+    this.googleCalendarService.updateSession(userId, sessionId, planId).catch((err) => {
+      this.logger.error(
+        `Google Calendar update failed for session ${sessionId}`,
+        err,
+      );
+    });
 
     return updated;
   }

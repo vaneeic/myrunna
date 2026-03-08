@@ -9,6 +9,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../shared/services/auth.service';
 import { StravaService } from '../shared/services/strava.service';
+import { GoogleCalendarService } from '../shared/services/google-calendar.service';
 
 @Component({
   selector: 'app-settings',
