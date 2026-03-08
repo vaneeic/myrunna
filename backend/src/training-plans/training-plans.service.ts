@@ -508,7 +508,22 @@ export class TrainingPlansService {
     if (!session[0]) throw new NotFoundException('Session not found');
 
     const updateData: Partial<typeof trainingSessions.$inferInsert> = {};
-    if (dto.date !== undefined) updateData.date = dto.date;
+    if (dto.date !== undefined) {
+      updateData.date = dto.date;
+      // Find the week containing the new date and reassign weekId
+      const allWeeks = await this.db
+        .select()
+        .from(trainingWeeks)
+        .where(eq(trainingWeeks.planId, planId));
+      const targetWeek = allWeeks.find((w) => {
+        const weekStart = new Date(w.startDate);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        const targetDate = new Date(dto.date!);
+        return targetDate >= weekStart && targetDate <= weekEnd;
+      });
+      if (targetWeek) updateData.weekId = targetWeek.id;
+    }
     if (dto.sessionType !== undefined) updateData.sessionType = dto.sessionType;
     if (dto.description !== undefined) updateData.description = dto.description;
     if (dto.plannedDistanceKm !== undefined) updateData.plannedDistanceKm = dto.plannedDistanceKm;

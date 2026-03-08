@@ -89,16 +89,25 @@ import {
                 Peak ~{{ peakVolumeKm() | number:'1.0-1' }} km/week
               </p>
             </div>
-            @if (!plan()!.isActive) {
-              <button
+            <div class="flex items-center gap-2">
+              <a
                 mat-stroked-button
-                color="primary"
-                (click)="activate()"
-                [disabled]="activating()"
+                [routerLink]="['/plans', plan()!.id, 'calendar']"
               >
-                Set as active
-              </button>
-            }
+                <mat-icon>calendar_month</mat-icon>
+                Calendar view
+              </a>
+              @if (!plan()!.isActive) {
+                <button
+                  mat-stroked-button
+                  color="primary"
+                  (click)="activate()"
+                  [disabled]="activating()"
+                >
+                  Set as active
+                </button>
+              }
+            </div>
           </div>
         </div>
 
