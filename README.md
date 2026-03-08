@@ -125,6 +125,7 @@ API docs available at: http://localhost:3000/api/docs
 - [x] Cutback weeks (every 4th week, 70% volume)
 - [x] Taper weeks (last 15% of plan)
 - [x] 5-session weekly schedule (easy, intervals, tempo, long run, recovery)
+- [x] Mark session as skipped with optional Strava activity URL (`PATCH /api/plans/:id/sessions/:sessionId`)
 - [ ] B/C race taper flagging
 - [ ] Session editing / drag-and-drop reorder
 
@@ -139,6 +140,27 @@ API docs available at: http://localhost:3000/api/docs
 - [x] Dashboard, Plans list, Plan detail, Settings, Strava pages
 - [x] Strava connect/disconnect from Settings
 - [x] Create training plan form with datepicker
+- [x] Skip session with optional Strava activity link (plan detail + calendar)
 - [ ] Week-by-week Gantt/timeline view
 - [ ] Drag-and-drop session builder
 - [ ] Dashboard with live data (upcoming sessions, weekly stats)
+
+## API Reference
+
+### `PATCH /api/plans/:planId/sessions/:sessionId`
+
+Update a training session, including skip state and optional Strava activity URL.
+
+**Request body** (all fields optional):
+
+```json
+{
+  "skipped": true,
+  "stravaActivityUrl": "https://www.strava.com/activities/123456789"
+}
+```
+
+**Notes:**
+- Setting `skipped: true` on a completed session also clears `completed`
+- Set `stravaActivityUrl` to `""` to remove an existing link
+- Auth header required: `Authorization: Bearer <jwt>`
