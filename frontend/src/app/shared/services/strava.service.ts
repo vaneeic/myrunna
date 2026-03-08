@@ -31,14 +31,24 @@ export interface StravaActivity {
   sufferScore?: number;
 }
 
+export interface ActivitiesResponse {
+  activities: StravaActivity[];
+  total: number;
+  page: number;
+  perPage: number;
+  totalPages: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class StravaService {
   private readonly _status = signal<StravaStatus>({ connected: false });
   private readonly _activities = signal<StravaActivity[]>([]);
+  private readonly _totalActivities = signal(0);
   private readonly _syncing = signal(false);
 
   readonly status = this._status.asReadonly();
   readonly activities = this._activities.asReadonly();
+  readonly totalActivities = this._totalActivities.asReadonly();
   readonly syncing = this._syncing.asReadonly();
 
   constructor(private readonly api: ApiService) {}
@@ -51,11 +61,16 @@ export class StravaService {
 
   loadActivities(params?: { page?: number; perPage?: number }) {
     return this.api
-      .get<StravaActivity[]>('/strava/activities', {
+      .get<ActivitiesResponse>('/strava/activities', {
         page: params?.page ?? 1,
         perPage: params?.perPage ?? 20,
       })
-      .pipe(tap((acts) => this._activities.set(acts)));
+      .pipe(
+        tap((response) => {
+          this._activities.set(response.activities);
+          this._totalActivities.set(response.total);
+        })
+      );
   }
 
   connect() {
@@ -80,6 +95,10 @@ export class StravaService {
         error: () => this._syncing.set(false),
       }),
     );
+  }
+
+  recalculatePaces() {
+    return this.api.post<any>('/strava/recalculate-paces', {});
   }
 
   disconnect() {

@@ -19,7 +19,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { Inject } from '@nestjs/common';
-import { eq, desc, and, gte, lte } from 'drizzle-orm';
+import { eq, desc, and, gte, lte, count } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { firstValueFrom } from 'rxjs';
 import { StravaTokenService } from './strava-token.service';
@@ -342,8 +342,9 @@ export class StravaService {
   /**
    * Calculate user's pace for different distances (5K, 10K, 15K, half marathon)
    * from their recent run activities and update in the users table.
+   * This is called automatically after sync, but can also be called manually.
    */
-  private async updateUserPacesByDistance(userId: string): Promise<void> {
+  async updateUserPacesByDistance(userId: string): Promise<void> {
     try {
       // Get user's recent run activities (last 50, excluding very short runs)
       const activities = await this.db
@@ -490,13 +491,29 @@ export class StravaService {
     perPage = 20,
   ) {
     const offset = (page - 1) * perPage;
-    return this.db
+    
+    // Get total count
+    const [{ value: total }] = await this.db
+      .select({ value: count() })
+      .from(stravaActivities)
+      .where(eq(stravaActivities.userId, userId));
+    
+    // Get paginated activities
+    const activities = await this.db
       .select()
       .from(stravaActivities)
       .where(eq(stravaActivities.userId, userId))
       .orderBy(desc(stravaActivities.startDate))
       .limit(perPage)
       .offset(offset);
+    
+    return {
+      activities,
+      total,
+      page,
+      perPage,
+      totalPages: Math.ceil(total / perPage),
+    };
   }
 
   // ---------------------------------------------------------------------------

@@ -141,6 +141,19 @@ export class StravaController {
     });
   }
 
+  @Post('recalculate-paces')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Recalculate pace zones from existing Strava activities',
+    description: 'Analyzes your synced Strava activities to recalculate average paces for different distances (5K, 10K, 15K, half marathon). Does not sync new activities.'
+  })
+  async recalculatePaces(@CurrentUser() user: { id: string }) {
+    await this.stravaService.updateUserPacesByDistance(user.id);
+    return { message: 'Paces recalculated successfully from your Strava activities' };
+  }
+
   @Get('activities')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
