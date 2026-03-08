@@ -1,29 +1,22 @@
-// Tailwind directives — must come before Angular Material theme
+// Angular Material theme (@use must come first in SCSS)
+@use '@angular/material' as mat;
+
+// Tailwind directives
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-// Angular Material theme
-@use '@angular/material' as mat;
-@include mat.core();
-
-$myrunna-primary: mat.define-palette(mat.$green-palette, 600, 400, 800);
-$myrunna-accent: mat.define-palette(mat.$orange-palette, 600);
-$myrunna-warn: mat.define-palette(mat.$red-palette);
-
-$myrunna-theme: mat.define-light-theme((
-  color: (
-    primary: $myrunna-primary,
-    accent: $myrunna-accent,
-    warn: $myrunna-warn,
-  ),
-  typography: mat.define-typography-config(
-    $font-family: 'Inter, Roboto, "Helvetica Neue", sans-serif',
-  ),
-  density: 0,
-));
-
-@include mat.all-component-themes($myrunna-theme);
+// Angular Material v19 theme (M3)
+html {
+  @include mat.theme((
+    color: (
+      primary: mat.$green-palette,
+      tertiary: mat.$orange-palette,
+    ),
+    typography: Inter,
+    density: 0,
+  ));
+}
 
 // Global base styles
 html, body {

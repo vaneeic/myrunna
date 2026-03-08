@@ -22,7 +22,9 @@ export const stravaCredentials = pgTable('strava_credentials', {
   refreshTokenEncrypted: text('refresh_token_encrypted').notNull(),
   expiresAt: bigint('expires_at', { mode: 'number' }).notNull(), // Unix timestamp
   athleteId: bigint('athlete_id', { mode: 'number' }).notNull(),
+  athleteName: varchar('athlete_name', { length: 255 }),
   scope: varchar('scope', { length: 255 }).notNull(),
+  lastSyncedAt: timestamp('last_synced_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

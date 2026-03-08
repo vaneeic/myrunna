@@ -60,7 +60,7 @@ import { ApiService } from '../../shared/services/api.service';
           <mat-form-field appearance="outline">
             <mat-label>Current weekly volume (km)</mat-label>
             <input matInput type="number" formControlName="currentWeeklyVolumeKm" min="0" max="300" />
-            <mat-suffix>km</mat-suffix>
+            <span matSuffix>km</span>
             <mat-hint>How many km you currently run per week</mat-hint>
             <mat-error>Enter a value between 0 and 300</mat-error>
           </mat-form-field>
@@ -94,19 +94,21 @@ export class CreatePlanComponent {
 
   readonly minDate = new Date();
 
-  form = this.fb.group({
-    name: ['', [Validators.required, Validators.minLength(3)]],
-    goalEvent: ['', [Validators.required, Validators.minLength(2)]],
-    goalDate: [null as Date | null, [Validators.required]],
-    currentWeeklyVolumeKm: [0, [Validators.required, Validators.min(0), Validators.max(300)]],
-  });
+  form!: ReturnType<FormBuilder['group']>;
 
   constructor(
     private readonly fb: FormBuilder,
     private readonly api: ApiService,
     private readonly router: Router,
     private readonly snackBar: MatSnackBar,
-  ) {}
+  ) {
+    this.form = this.fb.group({
+      name: ['', [Validators.required, Validators.minLength(3)]],
+      goalEvent: ['', [Validators.required, Validators.minLength(2)]],
+      goalDate: [null as Date | null, [Validators.required]],
+      currentWeeklyVolumeKm: [0, [Validators.required, Validators.min(0), Validators.max(300)]],
+    });
+  }
 
   onSubmit() {
     if (this.form.invalid) return;

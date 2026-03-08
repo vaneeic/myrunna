@@ -19,7 +19,6 @@ import * as schema from '../db/schema';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
-const TAG_LENGTH = 16;
 
 @Injectable()
 export class StravaTokenService {
@@ -74,6 +73,7 @@ export class StravaTokenService {
       refreshToken: string;
       expiresAt: number;
       athleteId: number;
+      athleteName?: string;
       scope: string;
     },
   ) {
@@ -83,6 +83,7 @@ export class StravaTokenService {
       refreshTokenEncrypted: this.encrypt(tokens.refreshToken),
       expiresAt: tokens.expiresAt,
       athleteId: tokens.athleteId,
+      athleteName: tokens.athleteName ?? null,
       scope: tokens.scope,
     };
 
@@ -96,9 +97,17 @@ export class StravaTokenService {
           refreshTokenEncrypted: values.refreshTokenEncrypted,
           expiresAt: values.expiresAt,
           athleteId: values.athleteId,
+          athleteName: values.athleteName,
           scope: values.scope,
         },
       });
+  }
+
+  async updateLastSyncedAt(userId: string) {
+    await this.db
+      .update(stravaCredentials)
+      .set({ lastSyncedAt: new Date() })
+      .where(eq(stravaCredentials.userId, userId));
   }
 
   async getDecryptedTokens(userId: string) {
@@ -116,8 +125,17 @@ export class StravaTokenService {
       refreshToken: this.decrypt(cred.refreshTokenEncrypted),
       expiresAt: cred.expiresAt,
       athleteId: cred.athleteId,
+      athleteName: cred.athleteName,
       scope: cred.scope,
+      lastSyncedAt: cred.lastSyncedAt,
     };
+  }
+
+  async getAllConnectedUsers(): Promise<string[]> {
+    const result = await this.db
+      .select({ userId: stravaCredentials.userId })
+      .from(stravaCredentials);
+    return result.map((r) => r.userId);
   }
 
   isTokenExpired(expiresAt: number): boolean {

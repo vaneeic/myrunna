@@ -80,16 +80,18 @@ export class LoginComponent {
   loading = signal(false);
   error = signal<string | null>(null);
 
-  form = this.fb.group({
-    email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(8)]],
-  });
+  form!: ReturnType<FormBuilder['group']>;
 
   constructor(
     private readonly fb: FormBuilder,
     private readonly authService: AuthService,
     private readonly router: Router,
-  ) {}
+  ) {
+    this.form = this.fb.group({
+      email: ['', [Validators.required, Validators.email]],
+      password: ['', [Validators.required, Validators.minLength(8)]],
+    });
+  }
 
   onSubmit() {
     if (this.form.invalid) return;

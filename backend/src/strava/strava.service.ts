@@ -1,13 +1,14 @@
 /**
  * StravaService
  *
- * Handles Strava OAuth flow, token refresh, and activity sync.
+ * Handles Strava OAuth flow, token refresh, activity sync, and webhooks.
  *
  * Strava API notes:
  * - Access tokens expire after 6 hours — refresh is mandatory
  * - Rate limits: 100 req/15min, 1000 req/day
  * - activity:read_all scope required for private activities
  * - Pagination: max 200 activities per page
+ * - Webhook push subscriptions require a publicly accessible verify token
  */
 import {
   Injectable,
@@ -18,7 +19,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { Inject } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { firstValueFrom } from 'rxjs';
 import { StravaTokenService } from './strava-token.service';
@@ -41,9 +42,14 @@ export class StravaService {
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
+  // ---------------------------------------------------------------------------
+  // OAuth flow
+  // ---------------------------------------------------------------------------
+
   getAuthorizationUrl(userId: string): string {
     const clientId = this.configService.get<string>('STRAVA_CLIENT_ID');
     const redirectUri = this.configService.get<string>('STRAVA_REDIRECT_URI');
+    // activity:read_all includes private activities; profile:read_all for name/photo
     const scope = 'read,activity:read_all,profile:read_all';
 
     const params = new URLSearchParams({
@@ -75,15 +81,22 @@ export class StravaService {
       const { access_token, refresh_token, expires_at, athlete } =
         response.data;
 
+      const athleteName = athlete
+        ? `${athlete.firstname ?? ''} ${athlete.lastname ?? ''}`.trim()
+        : undefined;
+
       await this.tokenService.saveTokens(userId, {
         accessToken: access_token,
         refreshToken: refresh_token,
         expiresAt: expires_at,
         athleteId: athlete.id,
+        athleteName,
         scope: 'read,activity:read_all,profile:read_all',
       });
 
-      this.logger.log(`Strava connected for user ${userId}, athlete ${athlete.id}`);
+      this.logger.log(
+        `Strava connected for user ${userId}, athlete ${athlete.id} (${athleteName})`,
+      );
       return athlete;
     } catch (err) {
       this.logger.error('Failed to exchange Strava code for tokens', err);
@@ -91,9 +104,13 @@ export class StravaService {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Token refresh
+  // ---------------------------------------------------------------------------
+
   /**
-   * Get a valid access token, refreshing if expired.
-   * This is the entry point for all Strava API calls.
+   * Get a valid access token, auto-refreshing if within 5 minutes of expiry.
+   * This is the single entry point for all Strava API calls.
    */
   async getValidAccessToken(userId: string): Promise<string> {
     const tokens = await this.tokenService.getDecryptedTokens(userId);
@@ -134,6 +151,9 @@ export class StravaService {
         refreshToken: new_refresh,
         expiresAt: expires_at,
         athleteId: athlete?.id ?? existing!.athleteId,
+        athleteName: athlete
+          ? `${athlete.firstname ?? ''} ${athlete.lastname ?? ''}`.trim()
+          : (existing!.athleteName ?? undefined),
         scope: existing!.scope,
       });
 
@@ -141,19 +161,38 @@ export class StravaService {
       return access_token;
     } catch (err) {
       this.logger.error('Failed to refresh Strava token', err);
-      throw new UnauthorizedException('Strava token refresh failed — please reconnect');
+      throw new UnauthorizedException(
+        'Strava token refresh failed — please reconnect',
+      );
     }
   }
 
-  async syncActivities(userId: string, daysBack = 30): Promise<{ imported: number; updated: number }> {
+  // ---------------------------------------------------------------------------
+  // Activity sync
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Syncs Strava activities for a user.
+   * Uses `daysBack` for initial/manual syncs.
+   * For nightly cron, pass `sinceTimestamp` to only fetch new activities.
+   */
+  async syncActivities(
+    userId: string,
+    daysBack = 90,
+    sinceTimestamp?: number,
+  ): Promise<{ imported: number; updated: number }> {
     const accessToken = await this.getValidAccessToken(userId);
-    const after = Math.floor(Date.now() / 1000) - daysBack * 86400;
+
+    // If we have a lastSyncedAt, use that; otherwise fall back to daysBack
+    const after =
+      sinceTimestamp ??
+      Math.floor(Date.now() / 1000) - daysBack * 86400;
 
     let page = 1;
     let imported = 0;
     let updated = 0;
 
-    // Strava max 200 per page; keep paginating until empty
+    // Strava max 200 per page; keep paginating until empty page returned
     while (true) {
       const response = await firstValueFrom(
         this.httpService.get(`${STRAVA_API_BASE}/athlete/activities`, {
@@ -166,7 +205,7 @@ export class StravaService {
       if (!activities.length) break;
 
       for (const act of activities) {
-        // Only sync Run activities
+        // Only sync running activity types
         if (!act.type.toLowerCase().includes('run')) continue;
 
         const values = {
@@ -203,15 +242,49 @@ export class StravaService {
         }
       }
 
+      // If fewer than 200 returned, we're on the last page
       if (activities.length < 200) break;
       page++;
     }
+
+    // Record the sync time so the next nightly sync can use it
+    await this.tokenService.updateLastSyncedAt(userId);
 
     this.logger.log(
       `Strava sync for user ${userId}: +${imported} imported, ${updated} updated`,
     );
     return { imported, updated };
   }
+
+  /**
+   * Syncs all connected users — called by the nightly cron job.
+   * Uses lastSyncedAt timestamp so only new activities are fetched.
+   */
+  async syncAllUsers(): Promise<void> {
+    const userIds = await this.tokenService.getAllConnectedUsers();
+    this.logger.log(`Nightly sync: ${userIds.length} connected user(s)`);
+
+    for (const userId of userIds) {
+      try {
+        const tokens = await this.tokenService.getDecryptedTokens(userId);
+        if (!tokens) continue;
+
+        // Use lastSyncedAt if available, otherwise fall back to 1 day back
+        const sinceTimestamp = tokens.lastSyncedAt
+          ? Math.floor(tokens.lastSyncedAt.getTime() / 1000)
+          : Math.floor(Date.now() / 1000) - 86400;
+
+        await this.syncActivities(userId, 1, sinceTimestamp);
+      } catch (err) {
+        // Log but don't fail the whole batch if one user errors
+        this.logger.error(`Nightly sync failed for user ${userId}`, err);
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Status & disconnect
+  // ---------------------------------------------------------------------------
 
   async getConnectionStatus(userId: string) {
     const tokens = await this.tokenService.getDecryptedTokens(userId);
@@ -221,12 +294,155 @@ export class StravaService {
     return {
       connected: true,
       athleteId: tokens.athleteId,
+      athleteName: tokens.athleteName,
       scope: tokens.scope,
       expiresAt: tokens.expiresAt,
+      lastSyncedAt: tokens.lastSyncedAt,
     };
   }
 
   async disconnect(userId: string) {
     await this.tokenService.deleteTokens(userId);
+  }
+
+  async getActivities(
+    userId: string,
+    page = 1,
+    perPage = 20,
+  ) {
+    const offset = (page - 1) * perPage;
+    return this.db
+      .select()
+      .from(stravaActivities)
+      .where(eq(stravaActivities.userId, userId))
+      .orderBy(desc(stravaActivities.startDate))
+      .limit(perPage)
+      .offset(offset);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Webhook push subscription
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Verifies the Strava webhook subscription hub challenge.
+   * Strava sends a GET with hub.challenge and hub.verify_token.
+   * We must echo back hub.challenge if the verify_token matches.
+   */
+  verifyWebhookChallenge(
+    hubMode: string,
+    hubChallenge: string,
+    hubVerifyToken: string,
+  ): { 'hub.challenge': string } | null {
+    const expectedToken = this.configService.get<string>(
+      'STRAVA_WEBHOOK_VERIFY_TOKEN',
+    );
+
+    if (
+      hubMode === 'subscribe' &&
+      hubChallenge &&
+      hubVerifyToken === expectedToken
+    ) {
+      this.logger.log('Strava webhook subscription verified');
+      return { 'hub.challenge': hubChallenge };
+    }
+
+    this.logger.warn(
+      `Webhook verification failed — token mismatch or bad mode (mode=${hubMode})`,
+    );
+    return null;
+  }
+
+  /**
+   * Handles incoming Strava push events (activity creates/updates/deletes).
+   * Strava sends events for the athlete whose token we hold.
+   */
+  async handleWebhookEvent(event: any): Promise<void> {
+    this.logger.log(
+      `Webhook event received: ${event.object_type} ${event.aspect_type} id=${event.object_id}`,
+    );
+
+    // Only handle activity events
+    if (event.object_type !== 'activity') return;
+
+    const athleteId: number = event.owner_id;
+    if (!athleteId) return;
+
+    // Find which user owns this athlete ID
+    const userId = await this.findUserByAthleteId(athleteId);
+    if (!userId) {
+      this.logger.warn(`No user found for Strava athlete ${athleteId}`);
+      return;
+    }
+
+    if (event.aspect_type === 'create' || event.aspect_type === 'update') {
+      // Fetch just this one activity from Strava
+      try {
+        const accessToken = await this.getValidAccessToken(userId);
+        const response = await firstValueFrom(
+          this.httpService.get(
+            `${STRAVA_API_BASE}/activities/${event.object_id}`,
+            {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            },
+          ),
+        );
+        const act = response.data;
+
+        if (!act.type?.toLowerCase().includes('run')) return;
+
+        const values = {
+          userId,
+          stravaId: String(act.id),
+          name: act.name,
+          type: act.type,
+          distance: act.distance,
+          movingTime: act.moving_time,
+          elapsedTime: act.elapsed_time,
+          startDate: new Date(act.start_date),
+          averageHeartrate: act.average_heartrate ?? null,
+          maxHeartrate: act.max_heartrate ?? null,
+          averageCadence: act.average_cadence ?? null,
+          sufferScore: act.suffer_score ?? null,
+          rawJson: act,
+        };
+
+        await this.db
+          .insert(stravaActivities)
+          .values(values)
+          .onConflictDoUpdate({
+            target: stravaActivities.stravaId,
+            set: values,
+          });
+
+        this.logger.log(
+          `Webhook: upserted activity ${act.id} for user ${userId}`,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Webhook: failed to fetch activity ${event.object_id}`,
+          err,
+        );
+      }
+    } else if (event.aspect_type === 'delete') {
+      await this.db
+        .delete(stravaActivities)
+        .where(
+          eq(stravaActivities.stravaId, String(event.object_id)),
+        );
+      this.logger.log(
+        `Webhook: deleted activity ${event.object_id} for user ${userId}`,
+      );
+    }
+  }
+
+  private async findUserByAthleteId(athleteId: number): Promise<string | null> {
+    const { stravaCredentials } = schema;
+    const result = await this.db
+      .select({ userId: stravaCredentials.userId })
+      .from(stravaCredentials)
+      .where(eq(stravaCredentials.athleteId, athleteId))
+      .limit(1);
+    return result[0]?.userId ?? null;
   }
 }
