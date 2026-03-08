@@ -19,12 +19,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { Inject } from '@nestjs/common';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, gte, lte } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { firstValueFrom } from 'rxjs';
 import { StravaTokenService } from './strava-token.service';
 import { DATABASE_CONNECTION } from '../db/database.module';
-import { stravaActivities } from '../db/schema';
+import { stravaActivities, users } from '../db/schema';
 import * as schema from '../db/schema';
 
 const STRAVA_API_BASE = 'https://www.strava.com/api/v3';
@@ -250,10 +250,106 @@ export class StravaService {
     // Record the sync time so the next nightly sync can use it
     await this.tokenService.updateLastSyncedAt(userId);
 
+    // Calculate and update user's distance-specific paces from recent activities
+    await this.updateUserPacesByDistance(userId);
+
     this.logger.log(
       `Strava sync for user ${userId}: +${imported} imported, ${updated} updated`,
     );
     return { imported, updated };
+  }
+
+  /**
+   * Calculate user's pace for different distances (5K, 10K, 15K, half marathon)
+   * from their recent run activities and update in the users table.
+   */
+  private async updateUserPacesByDistance(userId: string): Promise<void> {
+    try {
+      // Get user's recent run activities (last 50, excluding very short runs)
+      const activities = await this.db
+        .select({
+          distance: stravaActivities.distance,
+          movingTime: stravaActivities.movingTime,
+        })
+        .from(stravaActivities)
+        .where(
+          and(
+            eq(stravaActivities.userId, userId),
+            eq(stravaActivities.type, 'Run'),
+            gte(stravaActivities.distance, 3000), // Min 3km
+            lte(stravaActivities.distance, 30000), // Max 30km (exclude ultras)
+          ),
+        )
+        .orderBy(desc(stravaActivities.startDate))
+        .limit(50);
+
+      if (activities.length === 0) {
+        this.logger.log(`No valid activities found for user ${userId} to calculate paces`);
+        return;
+      }
+
+      // Helper function to calculate weighted average pace for a distance range
+      const calculatePaceForRange = (minMeters: number, maxMeters: number): number | null => {
+        const rangeActivities = activities.filter(
+          (a) => a.distance >= minMeters && a.distance <= maxMeters,
+        );
+
+        if (rangeActivities.length === 0) return null;
+
+        // Take max 10 most recent for this range
+        const recentInRange = rangeActivities.slice(0, 10);
+
+        let totalWeightedPace = 0;
+        let totalWeight = 0;
+
+        recentInRange.forEach((act, index) => {
+          const distanceKm = act.distance / 1000;
+          const timeMinutes = act.movingTime / 60;
+          const paceMinPerKm = timeMinutes / distanceKm;
+
+          // Weight: most recent = 1.0, oldest = 0.5
+          const weight = 1.0 - (index / recentInRange.length) * 0.5;
+
+          totalWeightedPace += paceMinPerKm * weight;
+          totalWeight += weight;
+        });
+
+        return totalWeightedPace / totalWeight;
+      };
+
+      // Calculate distance-specific paces
+      const pace5k = calculatePaceForRange(3000, 7000); // 3-7 km
+      const pace10k = calculatePaceForRange(8000, 12000); // 8-12 km
+      const pace15k = calculatePaceForRange(13000, 18000); // 13-18 km
+      const paceHM = calculatePaceForRange(19000, 25000); // 19-25 km
+
+      // Update user's paces (only update non-null values)
+      const updates: any = {};
+      if (pace5k !== null) updates.pace5kMinPerKm = Math.round(pace5k * 100) / 100;
+      if (pace10k !== null) updates.pace10kMinPerKm = Math.round(pace10k * 100) / 100;
+      if (pace15k !== null) updates.pace15kMinPerKm = Math.round(pace15k * 100) / 100;
+      if (paceHM !== null) updates.paceHalfMarathonMinPerKm = Math.round(paceHM * 100) / 100;
+
+      if (Object.keys(updates).length > 0) {
+        await this.db
+          .update(users)
+          .set(updates)
+          .where(eq(users.id, userId));
+
+        this.logger.log(
+          `Updated paces for user ${userId}: ` +
+          `5K=${pace5k?.toFixed(2) ?? 'N/A'}, ` +
+          `10K=${pace10k?.toFixed(2) ?? 'N/A'}, ` +
+          `15K=${pace15k?.toFixed(2) ?? 'N/A'}, ` +
+          `HM=${paceHM?.toFixed(2) ?? 'N/A'}`,
+        );
+      } else {
+        this.logger.log(`No pace updates available for user ${userId}`);
+      }
+    } catch (err) {
+      this.logger.error(`Failed to update paces for user ${userId}`, err);
+      // Don't throw — this is optional enhancement
+    }
   }
 
   /**

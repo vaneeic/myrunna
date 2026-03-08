@@ -4,6 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../db/database.module';
 import { users, NewUser } from '../db/schema';
 import * as schema from '../db/schema';
+import { UpdatePacesDto } from './dto/update-paces.dto';
 
 @Injectable()
 export class UsersService {
@@ -49,6 +50,24 @@ export class UsersService {
     const result = await this.db
       .update(users)
       .set({ ...data })
+      .where(eq(users.id, userId))
+      .returning();
+
+    if (!result[0]) {
+      throw new NotFoundException('User not found');
+    }
+    return result[0];
+  }
+
+  async updatePaces(userId: string, data: UpdatePacesDto) {
+    const result = await this.db
+      .update(users)
+      .set({
+        pace5kMinPerKm: data.pace5kMinPerKm,
+        pace10kMinPerKm: data.pace10kMinPerKm,
+        pace15kMinPerKm: data.pace15kMinPerKm,
+        paceHalfMarathonMinPerKm: data.paceHalfMarathonMinPerKm,
+      })
       .where(eq(users.id, userId))
       .returning();
 

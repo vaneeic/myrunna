@@ -21,6 +21,7 @@ import {
   trainingWeeks,
   trainingSessions,
   races,
+  users,
   NewTrainingPlan,
   NewTrainingWeek,
   NewTrainingSession,
@@ -115,7 +116,7 @@ export class TrainingPlansService {
       .returning();
 
     // Generate weeks with progressive overload
-    await this.generateWeeks(plan.id, totalWeeks, dto.currentWeeklyVolumeKm, today, {
+    await this.generateWeeks(plan.id, totalWeeks, dto.currentWeeklyVolumeKm, today, userId, {
       runsPerWeek: plan.runsPerWeek,
       easyRunDay: plan.easyRunDay,
       longRunDay: plan.longRunDay,
@@ -135,6 +136,7 @@ export class TrainingPlansService {
     totalWeeks: number,
     startingVolumeKm: number,
     startDate: Date,
+    userId: string,
     preferences: {
       runsPerWeek: number;
       easyRunDay?: number | null;
@@ -188,7 +190,7 @@ export class TrainingPlansService {
 
     // Generate sessions for each week
     for (const week of insertedWeeks) {
-      await this.generateSessionsForWeek(week, preferences);
+      await this.generateSessionsForWeek(week, userId, preferences);
     }
   }
 
@@ -214,6 +216,7 @@ export class TrainingPlansService {
       isTaperWeek: boolean;
       isCutbackWeek: boolean;
     },
+    userId: string,
     preferences: {
       runsPerWeek: number;
       easyRunDay?: number | null;
@@ -221,6 +224,35 @@ export class TrainingPlansService {
       intervalRunDay?: number | null;
     },
   ) {
+    // Fetch user's distance-specific paces from Strava data
+    const user = await this.db
+      .select({ 
+        pace5k: users.pace5kMinPerKm,
+        pace10k: users.pace10kMinPerKm,
+        pace15k: users.pace15kMinPerKm,
+        paceHM: users.paceHalfMarathonMinPerKm,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    // Helper to select appropriate pace for a given distance
+    const getPaceForDistance = (distanceKm: number): number => {
+      const userPaces = user[0];
+      if (!userPaces) return 5.5; // Ultimate fallback: 5:30 min/km
+
+      // Select pace based on distance, with fallbacks
+      if (distanceKm < 8) {
+        return userPaces.pace5k ?? userPaces.pace10k ?? userPaces.pace15k ?? userPaces.paceHM ?? 5.5;
+      } else if (distanceKm < 13) {
+        return userPaces.pace10k ?? userPaces.pace5k ?? userPaces.pace15k ?? userPaces.paceHM ?? 5.5;
+      } else if (distanceKm < 19) {
+        return userPaces.pace15k ?? userPaces.pace10k ?? userPaces.paceHM ?? userPaces.pace5k ?? 5.5;
+      } else {
+        return userPaces.paceHM ?? userPaces.pace15k ?? userPaces.pace10k ?? userPaces.pace5k ?? 5.5;
+      }
+    };
+
     const sessions: NewTrainingSession[] = [];
     const weekStart = new Date(week.startDate);
 
@@ -236,10 +268,34 @@ export class TrainingPlansService {
     if (week.isTaperWeek) {
       // Taper week schedule (race week)
       const easyDay = preferences.easyRunDay ?? 2; // Default Tuesday
+      
+      const taperedVolume = week.weeklyVolumeKm;
+      const easyRunDistance = taperedVolume * 0.2;
+      const tempoDistance = taperedVolume * 0.15;
+      const shakeoutDistance = taperedVolume * 0.15;
+      
       schedule.push(
-        { dayOffset: easyDay, type: 'easy_run', distanceFraction: 0.2, durationMin: 30, description: 'Easy shakeout run — keep it very relaxed' },
-        { dayOffset: (easyDay + 2) % 7, type: 'tempo', distanceFraction: 0.15, durationMin: 25, description: 'Short tempo to maintain sharpness' },
-        { dayOffset: (easyDay + 3) % 7, type: 'easy_run', distanceFraction: 0.15, durationMin: 20, description: 'Easy legs — trust your training' },
+        { 
+          dayOffset: easyDay, 
+          type: 'easy_run', 
+          distanceFraction: 0.2, 
+          durationMin: Math.round(easyRunDistance * getPaceForDistance(easyRunDistance) * 1.1), 
+          description: 'Easy shakeout run — keep it very relaxed' 
+        },
+        { 
+          dayOffset: (easyDay + 2) % 7, 
+          type: 'tempo', 
+          distanceFraction: 0.15, 
+          durationMin: Math.round(tempoDistance * getPaceForDistance(tempoDistance) * 0.9), 
+          description: 'Short tempo to maintain sharpness' 
+        },
+        { 
+          dayOffset: (easyDay + 3) % 7, 
+          type: 'easy_run', 
+          distanceFraction: 0.15, 
+          durationMin: Math.round(shakeoutDistance * getPaceForDistance(shakeoutDistance) * 1.1), 
+          description: 'Easy legs — trust your training' 
+        },
         { dayOffset: 5, type: 'rest', distanceFraction: 0, durationMin: 0, description: 'Complete rest' },
         { dayOffset: 6, type: 'race', distanceFraction: 0, durationMin: 0, description: 'Race day!' },
       );
@@ -254,97 +310,112 @@ export class TrainingPlansService {
 
       if (runsPerWeek === 3) {
         // 3-day schedule: easy, long, interval/tempo
+        const easyDistance = week.weeklyVolumeKm * 0.3;
+        const intervalDistance = week.weeklyVolumeKm * 0.25;
+        const longDistance = week.weeklyVolumeKm * 0.45;
+        
         schedule.push(
           { 
             dayOffset: easyDay, 
             type: 'easy_run', 
             distanceFraction: 0.3, 
-            durationMin: 40, 
+            durationMin: Math.round(easyDistance * getPaceForDistance(easyDistance) * 1.1), 
             description: 'Easy aerobic run — conversational pace' 
           },
           { 
             dayOffset: intervalDay, 
             type: 'intervals', 
             distanceFraction: 0.25, 
-            durationMin: 45, 
+            durationMin: Math.round(intervalDistance * getPaceForDistance(intervalDistance) * 0.8), 
             description: '6x800m at 5km pace with 90s recovery' 
           },
           { 
             dayOffset: longDay, 
             type: 'long_run', 
             distanceFraction: 0.45, 
-            durationMin: 75, 
+            durationMin: Math.round(longDistance * getPaceForDistance(longDistance)), 
             description: 'Long run at easy aerobic pace' 
           },
         );
       } else if (runsPerWeek === 4) {
         // 4-day schedule: easy, tempo, long, recovery
+        const easyDistance = week.weeklyVolumeKm * 0.25;
+        const tempoDistance = week.weeklyVolumeKm * 0.2;
+        const longDistance = week.weeklyVolumeKm * 0.4;
+        const recoveryDistance = week.weeklyVolumeKm * 0.15;
+        
         schedule.push(
           { 
             dayOffset: easyDay, 
             type: 'easy_run', 
             distanceFraction: 0.25, 
-            durationMin: 40, 
+            durationMin: Math.round(easyDistance * getPaceForDistance(easyDistance) * 1.1), 
             description: 'Easy aerobic run — conversational pace' 
           },
           { 
             dayOffset: intervalDay, 
             type: 'tempo', 
             distanceFraction: 0.2, 
-            durationMin: 40, 
+            durationMin: Math.round(tempoDistance * getPaceForDistance(tempoDistance) * 0.9), 
             description: '20min tempo at comfortably hard effort (threshold pace)' 
           },
           { 
             dayOffset: longDay, 
             type: 'long_run', 
             distanceFraction: 0.4, 
-            durationMin: 75, 
+            durationMin: Math.round(longDistance * getPaceForDistance(longDistance)), 
             description: 'Long run at easy aerobic pace' 
           },
           { 
             dayOffset: (longDay + 1) % 7, 
             type: 'recovery', 
             distanceFraction: 0.15, 
-            durationMin: 25, 
+            durationMin: Math.round(recoveryDistance * getPaceForDistance(recoveryDistance) * 1.15), 
             description: 'Recovery jog — very easy, legs only' 
           },
         );
       } else {
         // 5+ day schedule: full program
+        const easyDistance = week.weeklyVolumeKm * 0.2;
+        const intervalDistance = week.weeklyVolumeKm * 0.15;
+        const tempoDistance = week.weeklyVolumeKm * 0.2;
+        const longDistance = week.weeklyVolumeKm * 0.35;
+        const recoveryDistance = week.weeklyVolumeKm * 0.1;
+        
         schedule.push(
           { 
             dayOffset: (longDay + 1) % 7, 
             type: 'easy_run', 
             distanceFraction: 0.2, 
-            durationMin: 40, 
+            durationMin: Math.round(easyDistance * getPaceForDistance(easyDistance) * 1.1), 
             description: 'Easy aerobic run — conversational pace' 
           },
           { 
             dayOffset: easyDay, 
             type: 'intervals', 
             distanceFraction: 0.15, 
-            durationMin: 45, 
+            durationMin: Math.round(intervalDistance * getPaceForDistance(intervalDistance) * 0.8), 
             description: '6x800m at 5km pace with 90s recovery' 
           },
           { 
             dayOffset: intervalDay, 
             type: 'tempo', 
             distanceFraction: 0.2, 
-            durationMin: 40, 
+            durationMin: Math.round(tempoDistance * getPaceForDistance(tempoDistance) * 0.9), 
             description: '20min tempo at comfortably hard effort (threshold pace)' 
           },
           { 
             dayOffset: longDay, 
             type: 'long_run', 
             distanceFraction: 0.35, 
-            durationMin: 75, 
+            durationMin: Math.round(longDistance * getPaceForDistance(longDistance)), 
             description: 'Long run at easy aerobic pace' 
           },
           { 
             dayOffset: (longDay + 1) % 7, 
             type: 'recovery', 
             distanceFraction: 0.1, 
-            durationMin: 25, 
+            durationMin: Math.round(recoveryDistance * getPaceForDistance(recoveryDistance) * 1.15), 
             description: 'Recovery jog — very easy, legs only' 
           },
         );
@@ -352,8 +423,18 @@ export class TrainingPlansService {
     }
 
     for (const s of schedule) {
+      // Calculate the actual date for this day of week
+      // s.dayOffset is day of week (0=Sunday, 6=Saturday)
+      const weekStartDay = weekStart.getDay(); // 0=Sunday, 6=Saturday
+      let daysToAdd = s.dayOffset - weekStartDay;
+      
+      // If the target day is before the week start day, add 7 to get next week's instance
+      if (daysToAdd < 0) {
+        daysToAdd += 7;
+      }
+      
       const sessionDate = new Date(weekStart);
-      sessionDate.setDate(weekStart.getDate() + s.dayOffset);
+      sessionDate.setDate(weekStart.getDate() + daysToAdd);
 
       sessions.push({
         weekId: week.id,

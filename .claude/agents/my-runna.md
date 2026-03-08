@@ -36,11 +36,11 @@ This is a greenfield project. Start by scaffolding the full stack, then we'll bu
    ```
 
 2. Set up the PostgreSQL schema with these core tables:
-   - `users` (id, email, password_hash, display_name, created_at)
+   - `users` (id, email, password_hash, display_name, pace_5k_min_per_km, pace_10k_min_per_km, pace_15k_min_per_km, pace_half_marathon_min_per_km, created_at)
    - `strava_credentials` (user_id, access_token, refresh_token, expires_at, athlete_id, scope)
-   - `training_plans` (id, user_id, name, goal_event, goal_date, created_at, is_active)
+   - `training_plans` (id, user_id, name, goal_event, goal_date, created_at, is_active, runs_per_week, easy_run_day, long_run_day, interval_run_day)
    - `races` (id, plan_id, name, date, distance_km, type ENUM('A','B','C'), location)
-   - `training_weeks` (id, plan_id, week_number, start_date, focus, weekly_volume_km)
+   - `training_weeks` (id, plan_id, week_number, start_date, focus, weekly_volume_km, is_taper_week, is_cutback_week)
    - `training_sessions` (id, week_id, date, session_type, description, planned_distance_km, planned_duration_min, completed, strava_activity_id)
    - `strava_activities` (id, user_id, strava_id, name, type, distance, moving_time, elapsed_time, start_date, average_heartrate, max_heartrate, average_cadence, suffer_score, raw_json)
 
@@ -63,6 +63,7 @@ Then implement:
 - Token refresh middleware (check expiry before every Strava API call)
 - `GET /api/strava/sync` — manually trigger activity import for last 30 days
 - Background job (node-cron or BullMQ) that syncs activities every night at 02:00
+- **Distance-specific pace calculation**: After each sync, analyze recent activities to calculate separate paces for 5K (3-7km), 10K (8-12km), 15K (13-18km), and half marathon (19-25km) distances using weighted averages (recent activities weighted higher)
 
 ---
 
@@ -70,11 +71,14 @@ Then implement:
 
 - CRUD for Training Plans with a target race (A-race) + optional B/C races
 - When B/C races are added, automatically flag sessions in that week as a race-taper 
+- **Training preferences**: User selects runs per week (3, 4, 5+) and preferred days for easy runs, long runs, and interval/tempo sessions (0=Sunday...6=Saturday)
 - Week-by-week plan generation based on:
   - Target race date
   - Current weekly volume (pulled from Strava history or user input)
   - Progressive overload logic (10% rule, cutback weeks every 4th week)
+- **Realistic duration estimates**: Session durations calculated from user's distance-specific paces with type-based multipliers (easy runs = pace × 1.1, long runs = pace × 1.0, tempo = pace × 0.9, intervals = pace × 0.8, recovery = pace × 1.15)
 - Session types: Easy Run, Long Run, Tempo, Intervals, Recovery, Race
+- **Manual pace override**: Users can manually adjust their target paces in settings if Strava data is unavailable or inaccurate
 
 ---
 
@@ -95,7 +99,7 @@ Key pages/components:
 - `/plans` — list of training plans
 - `/plans/:id` — plan detail with a week-by-week timeline view (like a Gantt/calendar)
 - `/plans/:id/builder` — drag-and-drop session scheduler
-- `/settings` — Strava connect/disconnect, profile settings
+- `/settings` — Strava connect/disconnect, profile settings, **training pace management** (view auto-calculated paces from Strava or manually set target paces for 5K/10K/15K/HM distances)
 - `/strava` — activity list with filtering
 
 Use Angular signals for state management. No NgRx unless the complexity demands it.
@@ -135,6 +139,52 @@ Ask me before making any major architectural decisions not covered above.
 - PostgreSQL is a native Railway plugin — you'll get a `DATABASE_URL` env var injected automatically into your service.
 - The `railway.toml` in the prompt wires the deploy config correctly for both frontend and backend services.
 
+---
+
+## Implementation Status
+
+### ✅ Completed Features
+
+**Phase 1 - Project Scaffolding**
+- Monorepo structure (frontend/backend/shared)
+- Database schema with Drizzle ORM
+- PostgreSQL migrations (0001-0006 applied)
+- Railway deployment config
+
+**Phase 2 - Strava Integration**
+- OAuth2 flow (connect, callback, disconnect)
+- Token refresh with AES-256-GCM encryption
+- Activity sync (manual and nightly scheduler at 02:00)
+- Distance-specific pace calculation (5K/10K/15K/HM) from recent run data
+
+**Phase 3 - Training Plan Builder**
+- CRUD operations for training plans
+- Training preferences (runs per week, preferred session days)
+- Progressive overload generation (+10% weekly, cutback every 4th week)
+- Taper week logic (2 weeks before race)
+- Pace-based duration calculations with session-type multipliers
+- Manual pace override in user settings
+
+**Phase 4 - Calendar Export** (Partial)
+- Google Calendar integration (OAuth, sync events)
+- `.ics` export endpoint implemented
+- Subscribable webcal:// link available
+
+**Phase 5 - Frontend**
+- Auth pages (login/register)
+- Dashboard with upcoming sessions
+- Training plans list and creation flow
+- Settings page with Strava integration, pace management
+- Strava activities view
+
+### 🚧 Pending Features
+- Manual session date editing (drag-and-drop rescheduling)
+- Session status tracking (completed, skipped)
+- Plan detail with Gantt/timeline view
+- B/C race management UI
+
+---
+
 # Persistent Agent Memory
 
 You have a persistent Persistent Agent Memory directory at `/Users/vaneeic/myrunna/.claude/agent-memory/my-runna/`. Its contents persist across conversations.
@@ -168,4 +218,13 @@ Explicit user requests:
 
 ## MEMORY.md
 
-Your MEMORY.md is currently empty. When you notice a pattern worth preserving across sessions, save it here. Anything in MEMORY.md will be included in your system prompt next time.
+Project memory is maintained in `/Users/vaneeic/myrunna/.claude/agent-memory/my-runna/MEMORY.md`.
+
+**Key patterns documented**:
+- Database schema migration workflow (create migration BEFORE modifying schema)
+- Distance-specific pace calculation logic (4 distance ranges with weighted averages)
+- Session duration formulas (distance × pace × type multiplier)
+- Day-of-week calculation for session scheduling
+- File paths for core modules (backend services, frontend components)
+
+Consult MEMORY.md before making changes to ensure consistency with established patterns.

@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdatePacesDto } from './dto/update-paces.dto';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -25,5 +26,14 @@ export class UsersController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.usersService.updateProfile(user.id, dto);
+  }
+
+  @Patch('me/paces')
+  @ApiOperation({ summary: 'Update training paces for different distances' })
+  updatePaces(
+    @CurrentUser() user: { id: string },
+    @Body() dto: UpdatePacesDto,
+  ) {
+    return this.usersService.updatePaces(user.id, dto);
   }
 }

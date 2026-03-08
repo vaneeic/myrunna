@@ -1,15 +1,19 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
+import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { AuthService } from '../shared/services/auth.service';
 import { StravaService } from '../shared/services/strava.service';
 import { GoogleCalendarService } from '../shared/services/google-calendar.service';
+import { UsersService } from '../shared/services/users.service';
 
 @Component({
   selector: 'app-settings',
@@ -17,12 +21,15 @@ import { GoogleCalendarService } from '../shared/services/google-calendar.servic
   imports: [
     CommonModule,
     DatePipe,
+    ReactiveFormsModule,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
     MatDividerModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
+    MatFormFieldModule,
+    MatInputModule,
   ],
   template: `
     <div class="p-6 max-w-2xl mx-auto">
@@ -117,6 +124,64 @@ import { GoogleCalendarService } from '../shared/services/google-calendar.servic
 
       <mat-divider class="mb-6"></mat-divider>
 
+      <!-- Pace Settings -->
+      <mat-card class="p-6 mb-6">
+        <h2 class="text-lg font-semibold mb-2 flex items-center gap-2">
+          <mat-icon>speed</mat-icon>
+          Training Paces
+        </h2>
+        <p class="text-sm text-gray-600 mb-4">
+          Set your target paces for different distances. These are automatically calculated from your Strava activities but can be manually adjusted.
+          Format: decimal minutes per km (e.g., 5:30/km = 5.5)
+        </p>
+
+        <form [formGroup]="paceForm" (ngSubmit)="savePaces()" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>5K Pace (min/km)</mat-label>
+              <input matInput type="number" step="0.05" formControlName="pace5k" placeholder="4.5">
+              <mat-hint>e.g., 4:30/km = 4.5</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>10K Pace (min/km)</mat-label>
+              <input matInput type="number" step="0.05" formControlName="pace10k" placeholder="5.0">
+              <mat-hint>e.g., 5:00/km = 5.0</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>15K Pace (min/km)</mat-label>
+              <input matInput type="number" step="0.05" formControlName="pace15k" placeholder="5.25">
+              <mat-hint>e.g., 5:15/km = 5.25</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Half Marathon Pace (min/km)</mat-label>
+              <input matInput type="number" step="0.05" formControlName="paceHM" placeholder="5.5">
+              <mat-hint>e.g., 5:30/km = 5.5</mat-hint>
+            </mat-form-field>
+          </div>
+
+          <div class="flex gap-2">
+            <button mat-raised-button color="primary" type="submit" [disabled]="savingPaces()">
+              @if (savingPaces()) {
+                <mat-spinner diameter="16" class="inline-block mr-2"></mat-spinner>
+                Saving...
+              } @else {
+                <mat-icon>save</mat-icon>
+                Save Paces
+              }
+            </button>
+            <button mat-stroked-button type="button" (click)="loadPaces()" [disabled]="savingPaces()">
+              <mat-icon>refresh</mat-icon>
+              Reset
+            </button>
+          </div>
+        </form>
+      </mat-card>
+
+      <mat-divider class="mb-6"></mat-divider>
+
       <!-- Sign out -->
       <button mat-stroked-button color="warn" (click)="authService.logout()">
         <mat-icon>logout</mat-icon>
@@ -128,9 +193,23 @@ import { GoogleCalendarService } from '../shared/services/google-calendar.servic
 export class SettingsComponent implements OnInit {
   readonly authService = inject(AuthService);
   readonly strava = inject(StravaService);
+  readonly usersService = inject(UsersService);
 
   private readonly route = inject(ActivatedRoute);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly fb = inject(FormBuilder);
+
+  paceForm: FormGroup;
+  savingPaces = signal(false);
+
+  constructor() {
+    this.paceForm = this.fb.group({
+      pace5k: [null],
+      pace10k: [null],
+      pace15k: [null],
+      paceHM: [null],
+    });
+  }
 
   ngOnInit() {
     // Show feedback from Strava OAuth redirect params
@@ -153,6 +232,50 @@ export class SettingsComponent implements OnInit {
     });
 
     this.strava.loadStatus().subscribe({ error: () => {} });
+    this.loadPaces();
+  }
+
+  loadPaces() {
+    this.usersService.getMe().subscribe({
+      next: (user) => {
+        this.paceForm.patchValue({
+          pace5k: user.pace5kMinPerKm,
+          pace10k: user.pace10kMinPerKm,
+          pace15k: user.pace15kMinPerKm,
+          paceHM: user.paceHalfMarathonMinPerKm,
+        });
+      },
+      error: () => {
+        this.snackBar.open('Failed to load pace settings.', 'Close', {
+          duration: 4000,
+        });
+      },
+    });
+  }
+
+  savePaces() {
+    this.savingPaces.set(true);
+    const formValue = this.paceForm.value;
+    
+    this.usersService.updatePaces({
+      pace5kMinPerKm: formValue.pace5k,
+      pace10kMinPerKm: formValue.pace10k,
+      pace15kMinPerKm: formValue.pace15k,
+      paceHalfMarathonMinPerKm: formValue.paceHM,
+    }).subscribe({
+      next: () => {
+        this.savingPaces.set(false);
+        this.snackBar.open('Pace settings saved successfully!', 'Close', {
+          duration: 3000,
+        });
+      },
+      error: () => {
+        this.savingPaces.set(false);
+        this.snackBar.open('Failed to save pace settings.', 'Close', {
+          duration: 4000,
+        });
+      },
+    });
   }
 
   connectStrava() {
