@@ -62,9 +62,19 @@ export class StravaService {
     return this.api.get<{ url: string }>('/strava/connect');
   }
 
-  sync() {
+  sync(options?: {
+    daysBack?: number;
+    afterDate?: string;
+    beforeDate?: string;
+  }) {
     this._syncing.set(true);
-    return this.api.post<SyncResult>('/strava/sync', {}).pipe(
+    
+    const params: any = {};
+    if (options?.daysBack !== undefined) params.daysBack = options.daysBack;
+    if (options?.afterDate) params.afterDate = options.afterDate;
+    if (options?.beforeDate) params.beforeDate = options.beforeDate;
+    
+    return this.api.post<SyncResult>('/strava/sync', {}, params).pipe(
       tap({
         next: () => this._syncing.set(false),
         error: () => this._syncing.set(false),
