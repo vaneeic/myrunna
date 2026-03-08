@@ -379,7 +379,7 @@ export class GoogleCalendarService {
       do {
         const response = await calendarApi.events.list({
           calendarId: creds.calendarId,
-          privateExtendedProperty: `${KEY_PLAN_ID}=${planId}`,
+          privateExtendedProperty: [`${KEY_PLAN_ID}=${planId}`],
           maxResults: 250,
           pageToken,
         });
@@ -473,7 +473,7 @@ export class GoogleCalendarService {
     const existing = await calendarApi.events
       .list({
         calendarId,
-        privateExtendedProperty: `${KEY_SESSION_ID}=${session.id}`,
+        privateExtendedProperty: [`${KEY_SESSION_ID}=${session.id}`],
         maxResults: 1,
       })
       .catch(() => null);
