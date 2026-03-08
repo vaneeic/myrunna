@@ -57,4 +57,14 @@ export class UpdateSessionDto {
   @IsOptional()
   @IsBoolean()
   completed?: boolean;
+
+  @ApiProperty({ example: false, required: false })
+  @IsOptional()
+  @IsBoolean()
+  skipped?: boolean;
+
+  @ApiProperty({ example: 'https://www.strava.com/activities/123456789', required: false })
+  @IsOptional()
+  @IsString()
+  stravaActivityUrl?: string;
 }

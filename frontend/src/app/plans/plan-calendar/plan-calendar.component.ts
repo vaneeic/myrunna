@@ -432,6 +432,7 @@ export class PlanCalendarComponent implements OnInit {
   }
 
   sessionClass(session: TrainingSession): string {
+    if (session.skipped) return 'bg-amber-100 text-amber-700 opacity-75 line-through';
     const cfg = SESSION_TYPE_CONFIG[session.sessionType];
     if (session.completed) return `${cfg.bgColor} ${cfg.color} opacity-75`;
     return `${cfg.bgColor} ${cfg.color}`;
@@ -452,6 +453,8 @@ export class PlanCalendarComponent implements OnInit {
     if (session.plannedDurationMin) parts.push(`~${session.plannedDurationMin} min`);
     if (session.description) parts.push(session.description);
     if (session.completed) parts.push('✓ Completed');
+    if (session.skipped) parts.push('⊘ Skipped');
+    if (session.skipped && session.stravaActivityUrl) parts.push('Strava linked');
     return parts.join(' · ');
   }
 

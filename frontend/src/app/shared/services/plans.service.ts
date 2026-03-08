@@ -20,7 +20,9 @@ export interface TrainingSession {
   plannedDistanceKm: number | null;
   plannedDurationMin: number | null;
   completed: boolean;
+  skipped: boolean;
   stravaActivityId: string | null;
+  stravaActivityUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -84,6 +86,8 @@ export interface UpdateSessionPayload {
   plannedDistanceKm?: number;
   plannedDurationMin?: number;
   completed?: boolean;
+  skipped?: boolean;
+  stravaActivityUrl?: string;
 }
 
 export const SESSION_TYPE_CONFIG: Record<

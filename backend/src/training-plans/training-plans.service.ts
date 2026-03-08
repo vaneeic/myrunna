@@ -529,6 +529,8 @@ export class TrainingPlansService {
     if (dto.plannedDistanceKm !== undefined) updateData.plannedDistanceKm = dto.plannedDistanceKm;
     if (dto.plannedDurationMin !== undefined) updateData.plannedDurationMin = dto.plannedDurationMin;
     if (dto.completed !== undefined) updateData.completed = dto.completed;
+    if (dto.skipped !== undefined) updateData.skipped = dto.skipped;
+    if (dto.stravaActivityUrl !== undefined) updateData.stravaActivityUrl = dto.stravaActivityUrl;
 
     const [updated] = await this.db
       .update(trainingSessions)
