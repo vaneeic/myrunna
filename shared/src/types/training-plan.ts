@@ -17,6 +17,10 @@ export interface TrainingPlan {
   goalDate: Date;
   createdAt: Date;
   isActive: boolean;
+  runsPerWeek: number;
+  easyRunDay?: number | null;
+  longRunDay?: number | null;
+  intervalRunDay?: number | null;
 }
 
 export interface Race {
@@ -57,6 +61,10 @@ export interface CreateTrainingPlanRequest {
   goalEvent: string;
   goalDate: string; // ISO date string
   currentWeeklyVolumeKm: number;
+  runsPerWeek?: number;
+  easyRunDay?: number;
+  longRunDay?: number;
+  intervalRunDay?: number;
 }
 
 export interface PlanSummary extends TrainingPlan {

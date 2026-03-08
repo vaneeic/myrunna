@@ -5,6 +5,8 @@ import {
   Min,
   Max,
   MinLength,
+  IsOptional,
+  IsInt,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -28,4 +30,49 @@ export class CreatePlanDto {
   @Min(0)
   @Max(300)
   currentWeeklyVolumeKm: number;
+
+  @ApiProperty({ 
+    example: 3, 
+    description: 'Number of runs per week',
+    required: false,
+    default: 3
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(7)
+  runsPerWeek?: number;
+
+  @ApiProperty({ 
+    example: 2, 
+    description: 'Day of week for easy runs (0=Sunday, 1=Monday, ..., 6=Saturday)',
+    required: false
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(6)
+  easyRunDay?: number;
+
+  @ApiProperty({ 
+    example: 0, 
+    description: 'Day of week for long runs (0=Sunday, 1=Monday, ..., 6=Saturday)',
+    required: false
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(6)
+  longRunDay?: number;
+
+  @ApiProperty({ 
+    example: 4, 
+    description: 'Day of week for interval/mixed runs (0=Sunday, 1=Monday, ..., 6=Saturday)',
+    required: false
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(6)
+  intervalRunDay?: number;
 }

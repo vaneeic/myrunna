@@ -98,7 +98,7 @@ export class TrainingPlansService {
       ),
     );
 
-    // Create the plan
+    // Create the plan with preferences
     const [plan] = await this.db
       .insert(trainingPlans)
       .values({
@@ -107,11 +107,20 @@ export class TrainingPlansService {
         goalEvent: dto.goalEvent,
         goalDate: dto.goalDate,
         currentWeeklyVolumeKm: dto.currentWeeklyVolumeKm,
+        runsPerWeek: dto.runsPerWeek ?? 3,
+        easyRunDay: dto.easyRunDay,
+        longRunDay: dto.longRunDay,
+        intervalRunDay: dto.intervalRunDay,
       } as NewTrainingPlan)
       .returning();
 
     // Generate weeks with progressive overload
-    await this.generateWeeks(plan.id, totalWeeks, dto.currentWeeklyVolumeKm, today);
+    await this.generateWeeks(plan.id, totalWeeks, dto.currentWeeklyVolumeKm, today, {
+      runsPerWeek: plan.runsPerWeek,
+      easyRunDay: plan.easyRunDay,
+      longRunDay: plan.longRunDay,
+      intervalRunDay: plan.intervalRunDay,
+    });
 
     // Sync to Google Calendar if the user has it connected (fire-and-forget)
     this.googleCalendarService.syncPlanToCalendar(userId, plan.id).catch((err) => {
@@ -126,6 +135,12 @@ export class TrainingPlansService {
     totalWeeks: number,
     startingVolumeKm: number,
     startDate: Date,
+    preferences: {
+      runsPerWeek: number;
+      easyRunDay?: number | null;
+      longRunDay?: number | null;
+      intervalRunDay?: number | null;
+    },
   ) {
     const weeks: NewTrainingWeek[] = [];
     let currentVolume = startingVolumeKm;
@@ -173,7 +188,7 @@ export class TrainingPlansService {
 
     // Generate sessions for each week
     for (const week of insertedWeeks) {
-      await this.generateSessionsForWeek(week);
+      await this.generateSessionsForWeek(week, preferences);
     }
   }
 
@@ -190,39 +205,151 @@ export class TrainingPlansService {
     return 'Peak — race-specific fitness';
   }
 
-  private async generateSessionsForWeek(week: {
-    id: string;
-    weekNumber: number;
-    startDate: string;
-    weeklyVolumeKm: number;
-    isTaperWeek: boolean;
-    isCutbackWeek: boolean;
-  }) {
+  private async generateSessionsForWeek(
+    week: {
+      id: string;
+      weekNumber: number;
+      startDate: string;
+      weeklyVolumeKm: number;
+      isTaperWeek: boolean;
+      isCutbackWeek: boolean;
+    },
+    preferences: {
+      runsPerWeek: number;
+      easyRunDay?: number | null;
+      longRunDay?: number | null;
+      intervalRunDay?: number | null;
+    },
+  ) {
     const sessions: NewTrainingSession[] = [];
     const weekStart = new Date(week.startDate);
 
-    // Standard 5-day plan: Mon, Tue, Thu, Sat, Sun
+    // Build schedule based on preferences
     const schedule: Array<{
       dayOffset: number;
       type: SessionType;
       distanceFraction: number;
       durationMin: number;
       description: string;
-    }> = week.isTaperWeek
-      ? [
-          { dayOffset: 0, type: 'easy_run', distanceFraction: 0.2, durationMin: 30, description: 'Easy shakeout run — keep it very relaxed' },
-          { dayOffset: 2, type: 'tempo', distanceFraction: 0.15, durationMin: 25, description: 'Short tempo to maintain sharpness' },
-          { dayOffset: 4, type: 'easy_run', distanceFraction: 0.15, durationMin: 20, description: 'Easy legs — trust your training' },
-          { dayOffset: 5, type: 'rest', distanceFraction: 0, durationMin: 0, description: 'Complete rest' },
-          { dayOffset: 6, type: 'race', distanceFraction: 0, durationMin: 0, description: 'Race day!' },
-        ]
-      : [
-          { dayOffset: 0, type: 'easy_run', distanceFraction: 0.2, durationMin: 40, description: 'Easy aerobic run — conversational pace' },
-          { dayOffset: 1, type: 'intervals', distanceFraction: 0.15, durationMin: 45, description: '6x800m at 5km pace with 90s recovery' },
-          { dayOffset: 3, type: 'tempo', distanceFraction: 0.2, durationMin: 40, description: '20min tempo at comfortably hard effort (threshold pace)' },
-          { dayOffset: 5, type: 'long_run', distanceFraction: 0.35, durationMin: 75, description: 'Long run at easy aerobic pace' },
-          { dayOffset: 6, type: 'recovery', distanceFraction: 0.1, durationMin: 25, description: 'Recovery jog — very easy, legs only' },
-        ];
+    }> = [];
+
+    if (week.isTaperWeek) {
+      // Taper week schedule (race week)
+      const easyDay = preferences.easyRunDay ?? 2; // Default Tuesday
+      schedule.push(
+        { dayOffset: easyDay, type: 'easy_run', distanceFraction: 0.2, durationMin: 30, description: 'Easy shakeout run — keep it very relaxed' },
+        { dayOffset: (easyDay + 2) % 7, type: 'tempo', distanceFraction: 0.15, durationMin: 25, description: 'Short tempo to maintain sharpness' },
+        { dayOffset: (easyDay + 3) % 7, type: 'easy_run', distanceFraction: 0.15, durationMin: 20, description: 'Easy legs — trust your training' },
+        { dayOffset: 5, type: 'rest', distanceFraction: 0, durationMin: 0, description: 'Complete rest' },
+        { dayOffset: 6, type: 'race', distanceFraction: 0, durationMin: 0, description: 'Race day!' },
+      );
+    } else {
+      // Regular training week
+      const runsPerWeek = preferences.runsPerWeek;
+      
+      // Use user preferences or defaults (Tuesday=2, Sunday=0, Thursday=4)
+      const easyDay = preferences.easyRunDay ?? 2;
+      const longDay = preferences.longRunDay ?? 0;
+      const intervalDay = preferences.intervalRunDay ?? 4;
+
+      if (runsPerWeek === 3) {
+        // 3-day schedule: easy, long, interval/tempo
+        schedule.push(
+          { 
+            dayOffset: easyDay, 
+            type: 'easy_run', 
+            distanceFraction: 0.3, 
+            durationMin: 40, 
+            description: 'Easy aerobic run — conversational pace' 
+          },
+          { 
+            dayOffset: intervalDay, 
+            type: 'intervals', 
+            distanceFraction: 0.25, 
+            durationMin: 45, 
+            description: '6x800m at 5km pace with 90s recovery' 
+          },
+          { 
+            dayOffset: longDay, 
+            type: 'long_run', 
+            distanceFraction: 0.45, 
+            durationMin: 75, 
+            description: 'Long run at easy aerobic pace' 
+          },
+        );
+      } else if (runsPerWeek === 4) {
+        // 4-day schedule: easy, tempo, long, recovery
+        schedule.push(
+          { 
+            dayOffset: easyDay, 
+            type: 'easy_run', 
+            distanceFraction: 0.25, 
+            durationMin: 40, 
+            description: 'Easy aerobic run — conversational pace' 
+          },
+          { 
+            dayOffset: intervalDay, 
+            type: 'tempo', 
+            distanceFraction: 0.2, 
+            durationMin: 40, 
+            description: '20min tempo at comfortably hard effort (threshold pace)' 
+          },
+          { 
+            dayOffset: longDay, 
+            type: 'long_run', 
+            distanceFraction: 0.4, 
+            durationMin: 75, 
+            description: 'Long run at easy aerobic pace' 
+          },
+          { 
+            dayOffset: (longDay + 1) % 7, 
+            type: 'recovery', 
+            distanceFraction: 0.15, 
+            durationMin: 25, 
+            description: 'Recovery jog — very easy, legs only' 
+          },
+        );
+      } else {
+        // 5+ day schedule: full program
+        schedule.push(
+          { 
+            dayOffset: (longDay + 1) % 7, 
+            type: 'easy_run', 
+            distanceFraction: 0.2, 
+            durationMin: 40, 
+            description: 'Easy aerobic run — conversational pace' 
+          },
+          { 
+            dayOffset: easyDay, 
+            type: 'intervals', 
+            distanceFraction: 0.15, 
+            durationMin: 45, 
+            description: '6x800m at 5km pace with 90s recovery' 
+          },
+          { 
+            dayOffset: intervalDay, 
+            type: 'tempo', 
+            distanceFraction: 0.2, 
+            durationMin: 40, 
+            description: '20min tempo at comfortably hard effort (threshold pace)' 
+          },
+          { 
+            dayOffset: longDay, 
+            type: 'long_run', 
+            distanceFraction: 0.35, 
+            durationMin: 75, 
+            description: 'Long run at easy aerobic pace' 
+          },
+          { 
+            dayOffset: (longDay + 1) % 7, 
+            type: 'recovery', 
+            distanceFraction: 0.1, 
+            durationMin: 25, 
+            description: 'Recovery jog — very easy, legs only' 
+          },
+        );
+      }
+    }
 
     for (const s of schedule) {
       const sessionDate = new Date(weekStart);

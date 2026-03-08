@@ -36,6 +36,11 @@ export const trainingPlans = pgTable('training_plans', {
   currentWeeklyVolumeKm: doublePrecision('current_weekly_volume_km')
     .notNull()
     .default(0),
+  // Training preferences (0=Sunday, 1=Monday, ..., 6=Saturday)
+  runsPerWeek: integer('runs_per_week').notNull().default(3),
+  easyRunDay: integer('easy_run_day'), // e.g., 2 for Tuesday
+  longRunDay: integer('long_run_day'), // e.g., 0 for Sunday
+  intervalRunDay: integer('interval_run_day'), // e.g., 4 for Thursday
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

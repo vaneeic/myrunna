@@ -71,6 +71,10 @@ export interface CreatePlanPayload {
   goalEvent: string;
   goalDate: string;
   currentWeeklyVolumeKm: number;
+  runsPerWeek?: number;
+  easyRunDay?: number;
+  longRunDay?: number;
+  intervalRunDay?: number;
 }
 
 export interface UpdateSessionPayload {

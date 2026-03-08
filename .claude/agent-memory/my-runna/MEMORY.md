@@ -28,14 +28,15 @@ GitHub repo: https://github.com/vaneeic/myrunna (SSH: git@github.com:vaneeic/myr
 - Drizzle `inArray` used for batch session fetches (not subqueries)
 - Drizzle `innerJoin` is a query-builder method — NOT a named import from drizzle-orm
 
-## Phase Status (as of Phase 3 commit)
+## Phase Status (as of March 8, 2026)
 - Phase 1: Complete (scaffold, schema, auth, strava base, frontend base)
 - Phase 2: Strava OAuth + sync scaffolded; nightly cron + webhooks TODO
 - Phase 3: Complete — full CRUD, session update endpoint, CDK drag-and-drop, signal state
+- Phase 3.5: Training Preferences — Complete (runs per week, preferred days for easy/long/interval runs)
 - Phase 4: Calendar .ics export — NOT started
 - Phase 5: Drag-and-drop done in Phase 3; Gantt/calendar view TODO
 
-## Plans Feature (Phase 3)
+## Plans Feature (Phase 3 + 3.5)
 - `PlansService` — signal-based; `plans`, `loading`, `activePlan` signals exposed
 - `SESSION_TYPE_CONFIG` map exported from plans.service for colour-coded session badges
 - `updateSession` endpoint: `PATCH /api/training-plans/:id/sessions/:sessionId`
@@ -43,6 +44,14 @@ GitHub repo: https://github.com/vaneeic/myrunna (SSH: git@github.com:vaneeic/myr
 - CDK DragDropModule used for session reordering — import from `@angular/cdk/drag-drop`
 - Plan detail: optimistic UI updates with rollback on API error
 - `groupSessionsByWeek()` returns `Map<string, TrainingSession[]>` sorted by date
+
+### Training Preferences (Phase 3.5)
+- `runsPerWeek`: 3, 4, or 5 runs per week (default: 3)
+- `easyRunDay`, `longRunDay`, `intervalRunDay`: integers 0-6 (0=Sunday, 1=Monday, ..., 6=Saturday)
+- Defaults: Tuesday=easy, Sunday=long, Thursday=interval/tempo
+- Session generation now respects user preferences for scheduling
+- Migration 0004_training_preferences.sql adds columns to training_plans table
+- Frontend create-plan form has dropdowns for schedule preferences
 
 ## Common Pitfalls
 - `tsconfig.json` uses `module: nodenext` — imports may need file extensions

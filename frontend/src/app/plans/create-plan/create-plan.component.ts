@@ -11,6 +11,7 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSelectModule } from '@angular/material/select';
 import { PlansService } from '../../shared/services/plans.service';
 
 @Component({
@@ -29,6 +30,7 @@ import { PlansService } from '../../shared/services/plans.service';
     MatProgressSpinnerModule,
     MatSnackBarModule,
     MatIconModule,
+    MatSelectModule,
   ],
   template: `
     <div class="p-6 max-w-xl mx-auto">
@@ -74,6 +76,49 @@ import { PlansService } from '../../shared/services/plans.service';
             <mat-hint>How many km you currently run per week — this is your starting point</mat-hint>
             <mat-error>Enter a value between 0 and 300</mat-error>
           </mat-form-field>
+
+          <div class="border-t pt-4 mt-2">
+            <h3 class="text-sm font-semibold mb-3 text-gray-700">Weekly Schedule Preferences (Optional)</h3>
+
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Runs per week</mat-label>
+              <mat-select formControlName="runsPerWeek">
+                <mat-option [value]="3">3 runs per week</mat-option>
+                <mat-option [value]="4">4 runs per week</mat-option>
+                <mat-option [value]="5">5 runs per week</mat-option>
+              </mat-select>
+              <mat-hint>How many times you want to run weekly</mat-hint>
+            </mat-form-field>
+
+            <div class="grid grid-cols-3 gap-3">
+              <mat-form-field appearance="outline">
+                <mat-label>Easy run day</mat-label>
+                <mat-select formControlName="easyRunDay">
+                  @for (day of daysOfWeek; track day.value) {
+                    <mat-option [value]="day.value">{{ day.label }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Long run day</mat-label>
+                <mat-select formControlName="longRunDay">
+                  @for (day of daysOfWeek; track day.value) {
+                    <mat-option [value]="day.value">{{ day.label }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Interval/tempo day</mat-label>
+                <mat-select formControlName="intervalRunDay">
+                  @for (day of daysOfWeek; track day.value) {
+                    <mat-option [value]="day.value">{{ day.label }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </div>
 
           @if (weeksUntilRace() > 0) {
             <div class="rounded-lg bg-blue-50 border border-blue-200 p-3 text-sm text-blue-700 flex items-start gap-2">
@@ -124,6 +169,16 @@ export class CreatePlanComponent {
 
   readonly minDate = new Date();
 
+  readonly daysOfWeek = [
+    { value: 0, label: 'Sunday' },
+    { value: 1, label: 'Monday' },
+    { value: 2, label: 'Tuesday' },
+    { value: 3, label: 'Wednesday' },
+    { value: 4, label: 'Thursday' },
+    { value: 5, label: 'Friday' },
+    { value: 6, label: 'Saturday' },
+  ];
+
   form = this.fb.group({
     name: ['', [Validators.required, Validators.minLength(3)]],
     goalEvent: ['', [Validators.required, Validators.minLength(2)]],
@@ -132,6 +187,10 @@ export class CreatePlanComponent {
       30,
       [Validators.required, Validators.min(0), Validators.max(300)],
     ],
+    runsPerWeek: [3],
+    easyRunDay: [2], // Tuesday
+    longRunDay: [0], // Sunday
+    intervalRunDay: [4], // Thursday
   });
 
   weeksUntilRace(): number {
@@ -147,7 +206,7 @@ export class CreatePlanComponent {
     this.loading.set(true);
     this.error.set(null);
 
-    const { name, goalEvent, goalDate, currentWeeklyVolumeKm } = this.form.value;
+    const { name, goalEvent, goalDate, currentWeeklyVolumeKm, runsPerWeek, easyRunDay, longRunDay, intervalRunDay } = this.form.value;
 
     const goalDateStr = goalDate
       ? (goalDate as Date).toISOString().split('T')[0]
@@ -159,6 +218,10 @@ export class CreatePlanComponent {
         goalEvent: goalEvent!,
         goalDate: goalDateStr,
         currentWeeklyVolumeKm: currentWeeklyVolumeKm!,
+        runsPerWeek: runsPerWeek ?? undefined,
+        easyRunDay: easyRunDay ?? undefined,
+        longRunDay: longRunDay ?? undefined,
+        intervalRunDay: intervalRunDay ?? undefined,
       })
       .subscribe({
         next: (plan) => {
