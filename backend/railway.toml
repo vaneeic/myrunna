@@ -1,8 +1,7 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm run build && npx tsc --outDir dist src/db/migrate.ts --esModuleInterop --resolveJsonModule --module commonjs --target es2017 --skipLibCheck"
 
 [deploy]
-startCommand = "node dist/main"
+startCommand = "npm run build && node dist/main.js"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
