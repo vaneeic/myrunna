@@ -3,5 +3,4 @@ builder = "nixpacks"
 buildCommand = "npm run build"
 
 [deploy]
-# Angular build output goes to dist/frontend/browser
-startCommand = "npx serve dist/frontend/browser --listen $PORT --single"
+startCommand = "npx serve dist/frontend/browser --listen 8080 --single"
