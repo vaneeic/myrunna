@@ -97,6 +97,8 @@ export class TrainingPlansService {
   }
 
   async create(userId: string, dto: CreatePlanDto) {
+    this.logger.log(`Creating plan for user ${userId}: ${dto.name}`);
+    
     const goalDate = new Date(dto.goalDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -107,6 +109,8 @@ export class TrainingPlansService {
         (goalDate.getTime() - today.getTime()) / (7 * 24 * 60 * 60 * 1000),
       ),
     );
+
+    this.logger.log(`Generating ${totalWeeks} weeks for plan`);
 
     // Create the plan with preferences
     const [plan] = await this.db
@@ -124,6 +128,8 @@ export class TrainingPlansService {
       } as NewTrainingPlan)
       .returning();
 
+    this.logger.log(`Plan created with ID ${plan.id}, generating weeks...`);
+
     // Generate weeks with progressive overload
     await this.generateWeeks(plan.id, totalWeeks, dto.currentWeeklyVolumeKm, today, userId, {
       runsPerWeek: plan.runsPerWeek,
@@ -131,6 +137,8 @@ export class TrainingPlansService {
       longRunDay: plan.longRunDay,
       intervalRunDay: plan.intervalRunDay,
     });
+
+    this.logger.log(`Weeks and sessions generated for plan ${plan.id}`);
 
     // Sync to Google Calendar if the user has it connected (fire-and-forget)
     this.googleCalendarService.syncPlanToCalendar(userId, plan.id).catch((err) => {
@@ -153,6 +161,8 @@ export class TrainingPlansService {
       intervalRunDay?: number | null;
     },
   ) {
+    this.logger.log(`Generating ${totalWeeks} weeks for plan ${planId}`);
+    
     const weeks: NewTrainingWeek[] = [];
     let currentVolume = startingVolumeKm;
     let peakVolume = startingVolumeKm;
@@ -197,10 +207,14 @@ export class TrainingPlansService {
       .values(weeks)
       .returning();
 
+    this.logger.log(`Inserted ${insertedWeeks.length} weeks, generating sessions...`);
+
     // Generate sessions for each week
     for (const week of insertedWeeks) {
       await this.generateSessionsForWeek(week, userId, preferences);
     }
+    
+    this.logger.log(`Sessions generated for all ${insertedWeeks.length} weeks`);
   }
 
   private getWeekFocus(
@@ -244,6 +258,8 @@ export class TrainingPlansService {
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
+
+    this.logger.debug(`Week ${week.weekNumber}: User paces - 5K: ${user[0]?.pace5k}, 10K: ${user[0]?.pace10k}, 15K: ${user[0]?.pace15k}, HM: ${user[0]?.paceHM}`);
 
     // Helper to select appropriate pace for a given distance
     const getPaceForDistance = (distanceKm: number): number => {
@@ -459,6 +475,7 @@ export class TrainingPlansService {
       });
     }
 
+    this.logger.debug(`Week ${week.weekNumber}: Inserting ${sessions.length} sessions`);
     await this.db.insert(trainingSessions).values(sessions);
   }
 

@@ -201,7 +201,10 @@ export class CreatePlanComponent {
   }
 
   onSubmit() {
-    if (this.form.invalid) return;
+    if (this.form.invalid) {
+      console.error('Form is invalid:', this.form.errors);
+      return;
+    }
 
     this.loading.set(true);
     this.error.set(null);
@@ -212,23 +215,29 @@ export class CreatePlanComponent {
       ? (goalDate as Date).toISOString().split('T')[0]
       : '';
 
+    const payload = {
+      name: name!,
+      goalEvent: goalEvent!,
+      goalDate: goalDateStr,
+      currentWeeklyVolumeKm: currentWeeklyVolumeKm!,
+      runsPerWeek: runsPerWeek ?? undefined,
+      easyRunDay: easyRunDay ?? undefined,
+      longRunDay: longRunDay ?? undefined,
+      intervalRunDay: intervalRunDay ?? undefined,
+    };
+
+    console.log('Creating plan with payload:', payload);
+
     this.plansService
-      .createPlan({
-        name: name!,
-        goalEvent: goalEvent!,
-        goalDate: goalDateStr,
-        currentWeeklyVolumeKm: currentWeeklyVolumeKm!,
-        runsPerWeek: runsPerWeek ?? undefined,
-        easyRunDay: easyRunDay ?? undefined,
-        longRunDay: longRunDay ?? undefined,
-        intervalRunDay: intervalRunDay ?? undefined,
-      })
+      .createPlan(payload)
       .subscribe({
         next: (plan) => {
+          console.log('Plan created successfully:', plan);
           this.snackBar.open('Training plan created!', 'Close', { duration: 3000 });
           this.router.navigate(['/plans', plan.id]);
         },
         error: (err) => {
+          console.error('Failed to create plan:', err);
           this.error.set(err.error?.message || 'Failed to create plan. Please try again.');
           this.loading.set(false);
         },
