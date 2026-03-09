@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: '/api', // proxied by Railway — same domain in production
+  apiUrl: 'https://myrunna-api.up.railway.app/api',
 };
