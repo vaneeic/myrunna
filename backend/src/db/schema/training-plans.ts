@@ -83,6 +83,7 @@ export const trainingSessions = pgTable('training_sessions', {
   plannedDistanceKm: doublePrecision('planned_distance_km'),
   plannedDurationMin: integer('planned_duration_min'),
   completed: boolean('completed').notNull().default(false),
+  skipped: boolean('skipped').notNull().default(false),
   stravaActivityId: varchar('strava_activity_id', { length: 50 }),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

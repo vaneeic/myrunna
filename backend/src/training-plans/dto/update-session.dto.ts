@@ -57,4 +57,14 @@ export class UpdateSessionDto {
   @IsOptional()
   @IsBoolean()
   completed?: boolean;
+
+  @ApiProperty({ example: false, required: false })
+  @IsOptional()
+  @IsBoolean()
+  skipped?: boolean;
+
+  @ApiProperty({ example: '12345678901', required: false, description: 'Strava numeric activity ID from strava_activities.strava_id — links activity and marks session completed' })
+  @IsOptional()
+  @IsString()
+  stravaActivityId?: string | null;
 }

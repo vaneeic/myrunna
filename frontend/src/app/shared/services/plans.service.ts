@@ -11,6 +11,17 @@ export type SessionType =
   | 'race'
   | 'rest';
 
+export interface StravaActivitySummary {
+  id: string;
+  stravaId: string;
+  name: string;
+  type: string;
+  distance: number;       // metres
+  movingTime: number;     // seconds
+  startDate: string;      // ISO timestamp
+  averageHeartrate: number | null;
+}
+
 export interface TrainingSession {
   id: string;
   weekId: string;
@@ -20,7 +31,9 @@ export interface TrainingSession {
   plannedDistanceKm: number | null;
   plannedDurationMin: number | null;
   completed: boolean;
-  stravaActivityId: string | null;
+  skipped: boolean;
+  stravaActivityId: string | null;   // Strava numeric ID (strava_activities.strava_id)
+  stravaActivity: StravaActivitySummary | null; // joined, populated by backend
   createdAt: string;
   updatedAt: string;
 }
@@ -84,6 +97,8 @@ export interface UpdateSessionPayload {
   plannedDistanceKm?: number;
   plannedDurationMin?: number;
   completed?: boolean;
+  skipped?: boolean;
+  stravaActivityId?: string | null;
 }
 
 export const SESSION_TYPE_CONFIG: Record<
