@@ -5,9 +5,16 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import { runMigrations } from './db/migrate';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+
+  // Run DB migrations before starting the app
+  logger.log('Running database migrations...');
+  await runMigrations();
+  logger.log('Migrations complete.');
+
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug'],
   });

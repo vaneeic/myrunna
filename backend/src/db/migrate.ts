@@ -12,7 +12,7 @@ dotenv.config();
 
 const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 
-async function runMigrations() {
+export async function runMigrations(): Promise<void> {
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL environment variable is required');
   }
@@ -86,9 +86,12 @@ async function runMigrations() {
   }
 }
 
-runMigrations()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error('Migration failed:', err);
-    process.exit(1);
-  });
+// Only run directly when executed as a script (not imported)
+if (require.main === module) {
+  runMigrations()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('Migration failed:', err);
+      process.exit(1);
+    });
+}
