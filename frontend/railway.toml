@@ -1,7 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install && npm run build"
-installCommand = "npm install"
+buildCommand = "npm run build"
 
 [deploy]
 # Angular build output goes to dist/frontend/browser
