@@ -23,10 +23,25 @@ if (builder.Environment.IsDevelopment())
     }
 }
 
+// Convert postgres:// URI to Npgsql connection string if needed
+static string? ResolveConnectionString(string? raw)
+{
+    if (raw == null) return null;
+    if (!raw.StartsWith("postgres://") && !raw.StartsWith("postgresql://")) return raw;
+    var uri = new Uri(raw);
+    var userInfo = uri.UserInfo.Split(':');
+    var user = Uri.UnescapeDataString(userInfo[0]);
+    var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
+    var host = uri.Host;
+    var port = uri.Port > 0 ? uri.Port : 5432;
+    var database = uri.AbsolutePath.TrimStart('/');
+    return $"Host={host};Port={port};Database={database};Username={user};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+}
+
 // Map env vars into configuration sections
 builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 {
-    ["ConnectionStrings:DefaultConnection"] = Environment.GetEnvironmentVariable("DATABASE_URL"),
+    ["ConnectionStrings:DefaultConnection"] = ResolveConnectionString(Environment.GetEnvironmentVariable("DATABASE_URL")),
     ["Jwt:Secret"] = Environment.GetEnvironmentVariable("JWT_SECRET"),
     ["Jwt:ExpiresInDays"] = "7",
     ["Strava:ClientId"] = Environment.GetEnvironmentVariable("STRAVA_CLIENT_ID"),
