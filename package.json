@@ -5,16 +5,13 @@
   "description": "MyRunna — Personal running plan management app",
   "workspaces": [
     "frontend",
-    "backend",
     "shared"
   ],
   "scripts": {
-    "dev:backend": "npm run start:dev --workspace=backend",
+    "dev:backend": "dotnet run --project backend/MyRunna.Api.csproj",
     "dev:frontend": "npm run start --workspace=frontend",
-    "build:backend": "npm run build --workspace=backend",
-    "build:frontend": "npm run build --workspace=frontend",
-    "migrate": "npm run db:migrate --workspace=backend",
-    "migrate:generate": "npm run db:generate --workspace=backend"
+    "build:backend": "dotnet publish backend/MyRunna.Api.csproj -c Release",
+    "build:frontend": "npm run build --workspace=frontend"
   },
   "engines": {
     "node": ">=20.0.0",

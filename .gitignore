@@ -49,3 +49,8 @@ backend/src/db/migrations/meta/
 
 # Claude Code local settings (keep agent-memory, exclude local config)
 .claude/settings.local.json
+
+# .NET build artifacts
+backend/bin/
+backend/obj/
+*.user

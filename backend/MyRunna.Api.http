@@ -1,0 +1,6 @@
+@MyRunna.Api_HostAddress = http://localhost:5110
+
+GET {{MyRunna.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
