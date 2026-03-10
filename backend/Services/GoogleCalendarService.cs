@@ -13,9 +13,9 @@ namespace MyRunna.Api.Services;
 
 public class GoogleCalendarService(AppDbContext db, IConfiguration config, ILogger<GoogleCalendarService> logger)
 {
-    private readonly string _clientId = config["Google:ClientId"] ?? throw new InvalidOperationException("Google:ClientId not configured.");
-    private readonly string _clientSecret = config["Google:ClientSecret"] ?? throw new InvalidOperationException("Google:ClientSecret not configured.");
-    private readonly string _redirectUri = config["Google:RedirectUri"] ?? throw new InvalidOperationException("Google:RedirectUri not configured.");
+    private readonly string _clientId = config["Google:ClientId"] ?? "";
+    private readonly string _clientSecret = config["Google:ClientSecret"] ?? "";
+    private readonly string _redirectUri = config["Google:RedirectUri"] ?? "";
     private readonly string _frontendUrl = config["App:FrontendUrl"] ?? "http://localhost:4200";
 
     private TokenEncryptionService Encryption => new(
