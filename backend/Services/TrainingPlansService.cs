@@ -278,5 +278,53 @@ public class TrainingPlansService(AppDbContext db, GoogleCalendarService calenda
     }
 
     private static RaceDto MapRaceDto(Race r) => new(
-        r.Id, r.PlanId, r.Name, r.Date, r.DistanceKm, r.Type.ToString(), r.Location, r.CreatedAt);
+        r.Id, r.PlanId, r.Name, r.Date, r.DistanceKm, r.Type.ToString(), r.Location, r.Approach, r.CreatedAt);
+
+    // ── Race management ───────────────────────────────────────────────────────
+
+    public async Task<RaceDto> AddRaceAsync(Guid planId, Guid userId, CreateRaceRequest req)
+    {
+        var exists = await db.TrainingPlans.AnyAsync(p => p.Id == planId && p.UserId == userId);
+        if (!exists) throw new KeyNotFoundException("Plan not found.");
+
+        var race = new Race
+        {
+            PlanId = planId,
+            Name = req.Name,
+            Date = DateOnly.Parse(req.Date),
+            DistanceKm = req.DistanceKm,
+            Type = RaceType.B,
+            Location = req.Location,
+            Approach = req.Approach
+        };
+        db.Races.Add(race);
+        await db.SaveChangesAsync();
+        return MapRaceDto(race);
+    }
+
+    public async Task<RaceDto> UpdateRaceAsync(Guid planId, Guid raceId, Guid userId, UpdateRaceRequest req)
+    {
+        var race = await db.Races
+            .Include(r => r.Plan)
+            .FirstOrDefaultAsync(r => r.Id == raceId && r.PlanId == planId && r.Plan.UserId == userId)
+            ?? throw new KeyNotFoundException("Race not found.");
+
+        if (req.Name is not null) race.Name = req.Name;
+        if (req.Date is not null) race.Date = DateOnly.Parse(req.Date);
+        if (req.DistanceKm.HasValue) race.DistanceKm = req.DistanceKm.Value;
+        if (req.Location is not null) race.Location = req.Location;
+        if (req.Approach is not null) race.Approach = req.Approach;
+
+        await db.SaveChangesAsync();
+        return MapRaceDto(race);
+    }
+
+    public async Task DeleteRaceAsync(Guid planId, Guid raceId, Guid userId)
+    {
+        var deleted = await db.Races
+            .Where(r => r.Id == raceId && r.PlanId == planId && r.Plan.UserId == userId)
+            .ExecuteDeleteAsync();
+
+        if (deleted == 0) throw new KeyNotFoundException("Race not found.");
+    }
 }

@@ -14,6 +14,7 @@ public class Race
     [Column("distance_km")] public double DistanceKm { get; set; }
     [Column("type")] public RaceType Type { get; set; } = RaceType.B;
     [Column("location")] public string? Location { get; set; }
+    [Column("approach")] public string? Approach { get; set; }
     [Column("created_at")] public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public TrainingPlan Plan { get; set; } = null!;

@@ -25,10 +25,12 @@ import {
 } from '@angular/cdk/drag-drop';
 import {
   PlansService,
+  Race,
   TrainingPlanDetail,
   TrainingSession,
   TrainingWeek,
   SESSION_TYPE_CONFIG,
+  CreateRacePayload,
 } from '../../shared/services/plans.service';
 import { StravaService, StravaActivity } from '../../shared/services/strava.service';
 
@@ -348,6 +350,244 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
             </mat-expansion-panel>
           }
         </div>
+
+        <!-- Adapt Your Plan -->
+        <div class="mt-8">
+          <h2 class="text-lg font-semibold mb-3">Adapt Your Plan</h2>
+
+          <!-- Tab buttons -->
+          <div class="flex gap-2 mb-4 flex-wrap">
+            <button
+              class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
+              [class.bg-black]="adaptTab() === 'races'"
+              [class.text-white]="adaptTab() === 'races'"
+              [class.bg-gray-100]="adaptTab() !== 'races'"
+              [class.text-gray-700]="adaptTab() !== 'races'"
+              (click)="adaptTab.set('races')"
+            >B-races</button>
+            <button class="px-4 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-400 cursor-not-allowed" disabled>
+              Vacations
+            </button>
+            <button class="px-4 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-400 cursor-not-allowed" disabled>
+              Not feeling 100%
+            </button>
+          </div>
+
+          <!-- B-races tab -->
+          @if (adaptTab() === 'races') {
+            <div class="flex gap-3 flex-wrap">
+              <!-- Add B-race card -->
+              @if (!showAddRaceForm()) {
+                <button
+                  class="border-2 border-dashed border-gray-300 rounded-xl p-4 w-36 hover:border-gray-400 transition-colors flex flex-col items-center justify-center gap-2 min-h-[100px] bg-transparent"
+                  (click)="openAddRaceForm()"
+                >
+                  <mat-icon class="text-gray-400">add</mat-icon>
+                  <span class="text-sm text-gray-500 text-center leading-tight">Add a B-race</span>
+                </button>
+              }
+
+              <!-- Existing B-race cards -->
+              @for (race of bRaces(); track race.id) {
+                <button
+                  class="border rounded-xl p-4 w-36 text-left transition-all flex flex-col gap-2 min-h-[100px] hover:shadow-sm"
+                  [class.border-gray-200]="selectedBRaceId() !== race.id"
+                  [class.bg-white]="selectedBRaceId() !== race.id"
+                  [class.border-gray-900]="selectedBRaceId() === race.id"
+                  [class.shadow-md]="selectedBRaceId() === race.id"
+                  (click)="selectBRace(race)"
+                >
+                  <mat-icon class="text-gray-500 !w-5 !h-5 text-lg">flag</mat-icon>
+                  <div>
+                    <p class="text-sm font-medium leading-tight line-clamp-2">{{ race.name }}</p>
+                    <p class="text-xs text-gray-500 uppercase mt-0.5">{{ race.date | date:'MMM d, yyyy' }}</p>
+                  </div>
+                </button>
+              }
+            </div>
+
+            <!-- Add B-race form -->
+            @if (showAddRaceForm()) {
+              <mat-card class="mt-4 p-4">
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="font-medium">Add a B-race</h3>
+                  <button class="text-gray-400 hover:text-gray-600" (click)="showAddRaceForm.set(false)">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                  <div class="col-span-2">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Race name</label>
+                    <input
+                      type="text"
+                      class="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:border-gray-400"
+                      placeholder="e.g. Zandvoort Circuit Run 12K"
+                      [(ngModel)]="newRaceName"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Date</label>
+                    <input
+                      type="date"
+                      class="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:border-gray-400"
+                      [(ngModel)]="newRaceDate"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Distance (km)</label>
+                    <input
+                      type="number"
+                      class="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:border-gray-400"
+                      placeholder="12"
+                      min="0.1"
+                      max="500"
+                      [(ngModel)]="newRaceDistance"
+                    />
+                  </div>
+                  <div class="col-span-2">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Approach</label>
+                    <select
+                      class="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:border-gray-400 bg-white"
+                      [(ngModel)]="newRaceApproach"
+                    >
+                      <option value="Relaxed effort">Relaxed effort</option>
+                      <option value="Strong and steady">Strong and steady</option>
+                      <option value="Go all out">Go all out</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="flex justify-end gap-2">
+                  <button mat-stroked-button (click)="showAddRaceForm.set(false)">Cancel</button>
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    [disabled]="!newRaceName || !newRaceDate || !newRaceDistance || savingRace()"
+                    (click)="addBRace()"
+                  >
+                    @if (savingRace()) {
+                      <mat-spinner diameter="16" class="inline-block mr-1"></mat-spinner>
+                    }
+                    Add B-race
+                  </button>
+                </div>
+              </mat-card>
+            }
+
+            <!-- B-race detail panel -->
+            @if (selectedBRace(); as race) {
+              <mat-card class="mt-4 p-5">
+                <!-- B-Race Details -->
+                <div class="mb-5">
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">B-Race Details</p>
+                  <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div class="bg-gray-50 rounded-lg p-3">
+                      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Race</p>
+                      <p class="text-sm font-medium">{{ race.name }}</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Date</p>
+                      <p class="text-sm font-medium">{{ race.date | date:'MMM d, yyyy' }}</p>
+                    </div>
+                  </div>
+                  <div class="bg-gray-50 rounded-lg p-3 mb-2">
+                    <div class="flex items-center justify-between mb-1">
+                      <p class="text-xs text-gray-500 uppercase tracking-wide">Approach</p>
+                      @if (!editingApproach()) {
+                        <button class="text-gray-400 hover:text-gray-600 transition-colors" (click)="startEditApproach(race)">
+                          <mat-icon class="!w-4 !h-4 text-sm">edit</mat-icon>
+                        </button>
+                      }
+                    </div>
+                    @if (editingApproach()) {
+                      <div class="flex items-center gap-2 mt-1">
+                        <select
+                          class="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-gray-400 bg-white"
+                          [(ngModel)]="editingApproachValue"
+                        >
+                          <option value="Relaxed effort">Relaxed effort</option>
+                          <option value="Strong and steady">Strong and steady</option>
+                          <option value="Go all out">Go all out</option>
+                        </select>
+                        <button
+                          class="text-xs px-3 py-1 bg-gray-900 text-white rounded"
+                          (click)="saveApproach(race)"
+                        >Save</button>
+                        <button
+                          class="text-xs px-3 py-1 border border-gray-300 rounded"
+                          (click)="editingApproach.set(false)"
+                        >Cancel</button>
+                      </div>
+                    } @else {
+                      <p class="text-sm font-medium">{{ race.approach || 'Strong and steady' }}</p>
+                    }
+                  </div>
+                  <p class="text-xs text-gray-400">
+                    {{ race.distanceKm }} km
+                    @if (weeksUntilBRace(race.date) > 0) {
+                      &nbsp;&middot;&nbsp;In {{ weeksUntilBRace(race.date) }} {{ weeksUntilBRace(race.date) === 1 ? 'week' : 'weeks' }}
+                    } @else {
+                      &nbsp;&middot;&nbsp;<span class="text-gray-400">Past</span>
+                    }
+                  </p>
+                </div>
+
+                <!-- Adjustment Overview -->
+                <div>
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Adjustment Overview</p>
+                  <div class="bg-gray-50 rounded-lg p-3 mb-4 flex items-center gap-3">
+                    <mat-icon class="!w-4 !h-4 text-gray-500 text-sm flex-shrink-0">timelapse</mat-icon>
+                    <div>
+                      <p class="text-xs text-gray-500 uppercase tracking-wide">Training Disruption</p>
+                      <p class="text-sm font-medium">{{ trainingDisruption(race.approach || 'Strong and steady') }}</p>
+                    </div>
+                  </div>
+
+                  <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Adjustment Insight</p>
+                  <div class="flex gap-2 mb-3 flex-wrap">
+                    <button
+                      class="px-3 py-1 rounded-full text-xs font-medium transition-colors"
+                      [class.bg-red-100]="selectedAdjustTab() === 'pre'"
+                      [class.text-red-700]="selectedAdjustTab() === 'pre'"
+                      [class.bg-gray-100]="selectedAdjustTab() !== 'pre'"
+                      [class.text-gray-600]="selectedAdjustTab() !== 'pre'"
+                      (click)="selectedAdjustTab.set('pre')"
+                    >Pre B-Race Week</button>
+                    <button
+                      class="px-3 py-1 rounded-full text-xs font-medium transition-colors"
+                      [class.bg-gray-200]="selectedAdjustTab() === 'race'"
+                      [class.text-gray-700]="selectedAdjustTab() === 'race'"
+                      [class.bg-gray-100]="selectedAdjustTab() !== 'race'"
+                      [class.text-gray-600]="selectedAdjustTab() !== 'race'"
+                      (click)="selectedAdjustTab.set('race')"
+                    >B-Race Week</button>
+                    <button
+                      class="px-3 py-1 rounded-full text-xs font-medium transition-colors"
+                      [class.bg-gray-200]="selectedAdjustTab() === 'post'"
+                      [class.text-gray-700]="selectedAdjustTab() === 'post'"
+                      [class.bg-gray-100]="selectedAdjustTab() !== 'post'"
+                      [class.text-gray-600]="selectedAdjustTab() !== 'post'"
+                      (click)="selectedAdjustTab.set('post')"
+                    >Post B-Race Week</button>
+                  </div>
+                  <p class="text-sm text-gray-600 leading-relaxed">
+                    {{ adjustmentText(race.approach || 'Strong and steady', selectedAdjustTab()) }}
+                  </p>
+                </div>
+
+                <!-- Delete -->
+                <div class="mt-5 pt-4 border-t border-gray-100 flex justify-end">
+                  <button
+                    class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 transition-colors"
+                    (click)="deleteBRace(race)"
+                  >
+                    <mat-icon class="!w-3.5 !h-3.5 text-sm">delete</mat-icon>
+                    Remove B-race
+                  </button>
+                </div>
+              </mat-card>
+            }
+          }
+        </div>
       }
     </div>
   `,
@@ -606,5 +846,126 @@ export class PlanDetailComponent implements OnInit {
         this.snackBar.open('Failed to activate plan.', 'Close', { duration: 3000 });
       },
     });
+  }
+
+  // ── B-races ───────────────────────────────────────────────────────────────
+
+  readonly adaptTab = signal<'races'>('races');
+  readonly showAddRaceForm = signal(false);
+  readonly selectedBRaceId = signal<string | null>(null);
+  readonly savingRace = signal(false);
+  readonly editingApproach = signal(false);
+  readonly selectedAdjustTab = signal<'pre' | 'race' | 'post'>('pre');
+
+  newRaceName = '';
+  newRaceDate = '';
+  newRaceDistance = 10;
+  newRaceApproach = 'Strong and steady';
+  editingApproachValue = '';
+
+  readonly bRaces = computed(() =>
+    (this.plan()?.races ?? []).filter((r) => r.type === 'B'),
+  );
+
+  readonly selectedBRace = computed(() => {
+    const id = this.selectedBRaceId();
+    return this.bRaces().find((r) => r.id === id) ?? null;
+  });
+
+  openAddRaceForm() {
+    this.selectedBRaceId.set(null);
+    this.showAddRaceForm.set(true);
+  }
+
+  selectBRace(race: Race) {
+    this.showAddRaceForm.set(false);
+    this.editingApproach.set(false);
+    this.selectedBRaceId.set(this.selectedBRaceId() === race.id ? null : race.id);
+    this.selectedAdjustTab.set('pre');
+  }
+
+  addBRace() {
+    if (!this.newRaceName || !this.newRaceDate || !this.newRaceDistance) return;
+    this.savingRace.set(true);
+    this.plansService.addRace(this.id, {
+      name: this.newRaceName,
+      date: this.newRaceDate,
+      distanceKm: this.newRaceDistance,
+      approach: this.newRaceApproach,
+    }).subscribe({
+      next: (race) => {
+        this.plan.update((p) => (p ? { ...p, races: [...p.races, race] } : null));
+        this.showAddRaceForm.set(false);
+        this.savingRace.set(false);
+        this.selectedBRaceId.set(race.id);
+        this.newRaceName = '';
+        this.newRaceDate = '';
+        this.newRaceDistance = 10;
+        this.newRaceApproach = 'Strong and steady';
+      },
+      error: () => {
+        this.savingRace.set(false);
+        this.snackBar.open('Failed to add B-race.', 'Close', { duration: 3000 });
+      },
+    });
+  }
+
+  startEditApproach(race: Race) {
+    this.editingApproachValue = race.approach || 'Strong and steady';
+    this.editingApproach.set(true);
+  }
+
+  saveApproach(race: Race) {
+    this.plansService.updateRace(this.id, race.id, { approach: this.editingApproachValue }).subscribe({
+      next: (updated) => {
+        this.plan.update((p) =>
+          p ? { ...p, races: p.races.map((r) => (r.id === updated.id ? updated : r)) } : null,
+        );
+        this.editingApproach.set(false);
+      },
+      error: () => {
+        this.snackBar.open('Failed to update approach.', 'Close', { duration: 3000 });
+      },
+    });
+  }
+
+  deleteBRace(race: Race) {
+    this.plansService.deleteRace(this.id, race.id).subscribe({
+      next: () => {
+        this.plan.update((p) =>
+          p ? { ...p, races: p.races.filter((r) => r.id !== race.id) } : null,
+        );
+        this.selectedBRaceId.set(null);
+      },
+      error: () => {
+        this.snackBar.open('Failed to delete B-race.', 'Close', { duration: 3000 });
+      },
+    });
+  }
+
+  weeksUntilBRace(dateStr: string): number {
+    const today = new Date();
+    const raceDate = new Date(dateStr);
+    return Math.ceil((raceDate.getTime() - today.getTime()) / (7 * 24 * 60 * 60 * 1000));
+  }
+
+  trainingDisruption(approach: string): string {
+    return approach === 'Go all out' ? 'Medium' : 'Low';
+  }
+
+  adjustmentText(approach: string, period: 'pre' | 'race' | 'post'): string {
+    if (period === 'pre') {
+      if (approach === 'Relaxed effort') return 'No changes to your plan this week. Treat the B-race as a hard training run.';
+      if (approach === 'Go all out') return 'Volume is reduced by 30% and hard sessions are replaced with easy runs to keep you fresh.';
+      return 'Your volume is slightly reduced the week before to keep you fresh for race day.';
+    }
+    if (period === 'race') {
+      if (approach === 'Relaxed effort') return 'Run it at a comfortable, controlled effort — treat it like a tempo run.';
+      if (approach === 'Go all out') return 'Race day! Give it everything — run it with the same intensity as your A-race.';
+      return 'Race day! Run strong and steady. Give a solid effort while keeping something in reserve for your main goal.';
+    }
+    if (approach === 'Relaxed effort') return 'Normal training resumes immediately. No extra recovery needed.';
+    if (approach === 'Go all out') return 'A full recovery week follows with volume reduced by 40% to help you bounce back.';
+    return 'A lighter recovery week with 20% reduced volume to ensure you bounce back well.';
   }
 }

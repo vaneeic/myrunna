@@ -58,7 +58,24 @@ export interface Race {
   distanceKm: number;
   type: 'A' | 'B' | 'C';
   location: string | null;
+  approach: string | null;
   createdAt: string;
+}
+
+export interface CreateRacePayload {
+  name: string;
+  date: string;
+  distanceKm: number;
+  location?: string;
+  approach?: string;
+}
+
+export interface UpdateRacePayload {
+  name?: string;
+  date?: string;
+  distanceKm?: number;
+  location?: string;
+  approach?: string;
 }
 
 export interface TrainingPlan {
@@ -167,6 +184,18 @@ export class PlansService {
         this._plans.update((plans) => plans.filter((p) => p.id !== planId));
       }),
     );
+  }
+
+  addRace(planId: string, payload: CreateRacePayload) {
+    return this.api.post<Race>(`/training-plans/${planId}/races`, payload);
+  }
+
+  updateRace(planId: string, raceId: string, payload: UpdateRacePayload) {
+    return this.api.patch<Race>(`/training-plans/${planId}/races/${raceId}`, payload);
+  }
+
+  deleteRace(planId: string, raceId: string) {
+    return this.api.delete<void>(`/training-plans/${planId}/races/${raceId}`);
   }
 
   updateSession(planId: string, sessionId: string, payload: UpdateSessionPayload) {

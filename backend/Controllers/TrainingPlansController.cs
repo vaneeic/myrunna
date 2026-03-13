@@ -75,6 +75,48 @@ public class TrainingPlansController(TrainingPlansService plansService, ILogger<
         }
     }
 
+    [HttpPost("{id:guid}/races")]
+    public async Task<IActionResult> AddRace(Guid id, [FromBody] CreateRaceRequest req)
+    {
+        try
+        {
+            var race = await plansService.AddRaceAsync(id, UserId, req);
+            return Ok(race);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    [HttpPatch("{id:guid}/races/{raceId:guid}")]
+    public async Task<IActionResult> UpdateRace(Guid id, Guid raceId, [FromBody] UpdateRaceRequest req)
+    {
+        try
+        {
+            var race = await plansService.UpdateRaceAsync(id, raceId, UserId, req);
+            return Ok(race);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    [HttpDelete("{id:guid}/races/{raceId:guid}")]
+    public async Task<IActionResult> DeleteRace(Guid id, Guid raceId)
+    {
+        try
+        {
+            await plansService.DeleteRaceAsync(id, raceId, UserId);
+            return NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
     [HttpPatch("{id:guid}/sessions/{sessionId:guid}")]
     public async Task<IActionResult> UpdateSession(Guid id, Guid sessionId, [FromBody] UpdateSessionRequest req)
     {

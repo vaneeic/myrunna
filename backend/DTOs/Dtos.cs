@@ -77,7 +77,21 @@ public record TrainingSessionDto(Guid Id, Guid WeekId, DateOnly Date, string Ses
     StravaActivityDto? StravaActivity, DateTime CreatedAt, DateTime UpdatedAt);
 
 public record RaceDto(Guid Id, Guid PlanId, string Name, DateOnly Date, double DistanceKm,
-    string Type, string? Location, DateTime CreatedAt);
+    string Type, string? Location, string? Approach, DateTime CreatedAt);
+
+public record CreateRaceRequest(
+    [Required][MinLength(2)] string Name,
+    [Required] string Date,
+    [Range(0.1, 500)] double DistanceKm,
+    string? Location = null,
+    string? Approach = null);
+
+public record UpdateRaceRequest(
+    string? Name = null,
+    string? Date = null,
+    double? DistanceKm = null,
+    string? Location = null,
+    string? Approach = null);
 
 public record PlanDetailDto(Guid Id, Guid UserId, string Name, string GoalEvent,
     DateOnly GoalDate, bool IsActive, double CurrentWeeklyVolumeKm, int RunsPerWeek,
