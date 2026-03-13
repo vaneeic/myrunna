@@ -322,13 +322,13 @@ public class StravaService(AppDbContext db, StravaTokenService tokenService, ICo
         Name = a.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
         Type = a.TryGetProperty("type", out var tp) ? tp.GetString() ?? "" : "",
         Distance = a.GetProperty("distance").GetDouble(),
-        MovingTime = a.GetProperty("moving_time").GetInt32(),
-        ElapsedTime = a.GetProperty("elapsed_time").GetInt32(),
+        MovingTime = (int)a.GetProperty("moving_time").GetDouble(),
+        ElapsedTime = (int)a.GetProperty("elapsed_time").GetDouble(),
         StartDate = a.GetProperty("start_date").GetDateTime(),
         AverageHeartrate = a.TryGetProperty("average_heartrate", out var ahr) && ahr.ValueKind != JsonValueKind.Null ? ahr.GetDouble() : null,
         MaxHeartrate = a.TryGetProperty("max_heartrate", out var mhr) && mhr.ValueKind != JsonValueKind.Null ? mhr.GetDouble() : null,
         AverageCadence = a.TryGetProperty("average_cadence", out var ac) && ac.ValueKind != JsonValueKind.Null ? ac.GetDouble() : null,
-        SufferScore = a.TryGetProperty("suffer_score", out var ss) && ss.ValueKind != JsonValueKind.Null ? ss.GetInt32() : null,
+        SufferScore = a.TryGetProperty("suffer_score", out var ss) && ss.ValueKind != JsonValueKind.Null ? (int)ss.GetDouble() : null,
         RawJson = a.GetRawText()
     };
 
@@ -336,11 +336,11 @@ public class StravaService(AppDbContext db, StravaTokenService tokenService, ICo
     {
         existing.Name = a.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
         existing.Distance = a.GetProperty("distance").GetDouble();
-        existing.MovingTime = a.GetProperty("moving_time").GetInt32();
-        existing.ElapsedTime = a.GetProperty("elapsed_time").GetInt32();
+        existing.MovingTime = (int)a.GetProperty("moving_time").GetDouble();
+        existing.ElapsedTime = (int)a.GetProperty("elapsed_time").GetDouble();
         existing.AverageHeartrate = a.TryGetProperty("average_heartrate", out var ahr) && ahr.ValueKind != JsonValueKind.Null ? ahr.GetDouble() : null;
         existing.MaxHeartrate = a.TryGetProperty("max_heartrate", out var mhr) && mhr.ValueKind != JsonValueKind.Null ? mhr.GetDouble() : null;
-        existing.SufferScore = a.TryGetProperty("suffer_score", out var ss) && ss.ValueKind != JsonValueKind.Null ? ss.GetInt32() : null;
+        existing.SufferScore = a.TryGetProperty("suffer_score", out var ss) && ss.ValueKind != JsonValueKind.Null ? (int)ss.GetDouble() : null;
         existing.RawJson = a.GetRawText();
         existing.UpdatedAt = DateTime.UtcNow;
     }
