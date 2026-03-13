@@ -431,10 +431,10 @@ export class SettingsComponent implements OnInit {
         // Refresh status to show the updated lastSyncedAt
         this.strava.loadStatus().subscribe({ error: () => {} });
       },
-      error: () =>
-        this.snackBar.open('Sync failed. Please try again.', 'Close', {
-          duration: 4000,
-        }),
+      error: (err: any) => {
+        const msg = err?.error?.message || err?.message || 'Sync failed. Please try again.';
+        this.snackBar.open(`Sync failed: ${msg}`, 'Close', { duration: 10000 });
+      },
     });
   }
 }
