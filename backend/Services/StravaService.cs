@@ -117,7 +117,15 @@ public class StravaService(AppDbContext db, StravaTokenService tokenService, ICo
             var url = $"https://www.strava.com/api/v3/athlete/activities?per_page=200&page={page}&after={after}";
             if (before.HasValue) url += $"&before={before}";
 
-            var activities = await http.GetFromJsonAsync<JsonElement[]>(url) ?? [];
+            var activitiesResponse = await http.GetAsync(url);
+            if (!activitiesResponse.IsSuccessStatusCode)
+            {
+                var body = await activitiesResponse.Content.ReadAsStringAsync();
+                logger.LogError("Strava activities API returned {Status} for user {UserId}: {Body}",
+                    (int)activitiesResponse.StatusCode, userId, body);
+                throw new HttpRequestException($"Strava API error {(int)activitiesResponse.StatusCode}: {body}");
+            }
+            var activities = await activitiesResponse.Content.ReadFromJsonAsync<JsonElement[]>() ?? [];
             if (activities.Length == 0) break;
 
             foreach (var a in activities)

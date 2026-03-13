@@ -8,7 +8,7 @@ namespace MyRunna.Api.Controllers;
 
 [ApiController]
 [Route("api/strava")]
-public class StravaController(StravaService stravaService, IConfiguration config) : ControllerBase
+public class StravaController(StravaService stravaService, IConfiguration config, ILogger<StravaController> logger) : ControllerBase
 {
     private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
         ?? User.FindFirstValue("sub")!);
@@ -74,6 +74,11 @@ public class StravaController(StravaService stravaService, IConfiguration config
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Strava sync failed for user {UserId}", UserId);
+            return StatusCode(500, new { message = ex.Message });
         }
     }
 
