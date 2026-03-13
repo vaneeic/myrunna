@@ -14,7 +14,7 @@ html {
   @include mat.theme((
     color: (
       primary: mat.$orange-palette,
-      tertiary: mat.$indigo-palette,
+      tertiary: mat.$violet-palette,
     ),
     typography: Inter,
     density: 0,

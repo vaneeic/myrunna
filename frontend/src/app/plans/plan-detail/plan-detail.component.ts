@@ -139,7 +139,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                 [expanded]="isCurrentWeek(week)"
                 class="!rounded-2xl !shadow-none !border overflow-hidden"
                 [class.!border-slate-200]="!isCurrentWeek(week)"
-                [class.!border-[#f07561]]="isCurrentWeek(week)"
+                [style.border-color]="isCurrentWeek(week) ? '#f07561' : null"
                 [class.!shadow-md]="isCurrentWeek(week)"
                 [class.border-l-4]="week.isTaperWeek || week.isCutbackWeek"
                 [class.!border-l-blue-400]="week.isTaperWeek"
@@ -150,7 +150,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                     <!-- Week number circle -->
                     <span
                       class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                      [class.bg-[#f07561]]="isCurrentWeek(week)"
+                      [style.background-color]="isCurrentWeek(week) ? '#f07561' : null"
                       [class.text-white]="isCurrentWeek(week)"
                       [class.bg-slate-100]="!isCurrentWeek(week)"
                       [class.text-slate-600]="!isCurrentWeek(week)"
@@ -192,14 +192,12 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                   @for (session of sessionsForWeek(week.id); track session.id) {
                     <div
                       cdkDrag
-                      class="session-card group relative rounded-xl border transition-all cursor-grab active:cursor-grabbing overflow-hidden bg-white"
+                      class="session-card group relative rounded-xl border transition-all cursor-grab active:cursor-grabbing overflow-hidden bg-white hover:border-slate-200 hover:shadow-sm"
                       [class.border-slate-100]="!session.skipped && !session.stravaActivity"
-                      [class.hover:border-slate-200]="!session.skipped"
-                      [class.hover:shadow-sm]="!session.skipped"
                       [class.border-amber-200]="session.skipped"
-                      [class.bg-amber-50/60]="session.skipped"
+                      [class.bg-amber-50]="session.skipped"
                       [class.border-emerald-200]="!session.skipped && !!session.stravaActivity"
-                      [class.bg-emerald-50/40]="!session.skipped && !!session.stravaActivity"
+                      [class.bg-emerald-50]="!session.skipped && !!session.stravaActivity"
                       [class.opacity-50]="session.completed && !session.stravaActivity"
                     >
                       <!-- Colored left accent bar -->
@@ -262,10 +260,9 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                             </button>
                           } @else {
                             <button
-                              class="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
-                              [class.text-[#f07561]]="!!session.stravaActivity"
+                              class="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-orange-50"
+                              [style.color]="!!session.stravaActivity ? '#f07561' : null"
                               [class.text-slate-300]="!session.stravaActivity"
-                              [class.hover:bg-orange-50]="true"
                               [matTooltip]="session.stravaActivity ? 'Change linked activity' : 'Link Strava activity'"
                               (click)="openActivityPicker(session, $event)"
                             >
@@ -279,7 +276,6 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                               [class.border-emerald-500]="session.completed"
                               [class.bg-emerald-500]="session.completed"
                               [class.border-slate-200]="!session.completed"
-                              [class.hover:border-emerald-400]="!session.completed"
                               [matTooltip]="session.completed ? 'Mark incomplete' : 'Mark complete'"
                               (click)="toggleComplete(session, $event)"
                             >
@@ -326,7 +322,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                                   class="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-orange-50 text-left transition-colors w-full"
                                   [class.bg-orange-50]="session.stravaActivityId === act.stravaId"
                                   [class.ring-1]="session.stravaActivityId === act.stravaId"
-                                  [class.ring-[#f07561]]="session.stravaActivityId === act.stravaId"
+                                  [style.outline]="session.stravaActivityId === act.stravaId ? '2px solid #f07561' : null"
                                   (click)="linkActivity(session, act)"
                                 >
                                   <mat-icon class="!w-3.5 !h-3.5 text-[#f07561] flex-shrink-0">directions_run</mat-icon>
@@ -396,8 +392,6 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                     class="rounded-2xl p-4 w-40 text-left transition-all flex flex-col gap-3 min-h-[110px] border"
                     [class.bg-white]="selectedBRaceId() !== race.id"
                     [class.border-slate-200]="selectedBRaceId() !== race.id"
-                    [class.hover:border-slate-300]="selectedBRaceId() !== race.id"
-                    [class.hover:shadow-sm]="selectedBRaceId() !== race.id"
                     [class.bg-slate-900]="selectedBRaceId() === race.id"
                     [class.border-slate-900]="selectedBRaceId() === race.id"
                     [class.shadow-lg]="selectedBRaceId() === race.id"
@@ -406,11 +400,11 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                     <div
                       class="w-8 h-8 rounded-xl flex items-center justify-center"
                       [class.bg-slate-100]="selectedBRaceId() !== race.id"
-                      [class.bg-white/15]="selectedBRaceId() === race.id"
+                      [style.background-color]="selectedBRaceId() === race.id ? 'rgba(255,255,255,0.15)' : null"
                     >
                       <mat-icon
                         class="!w-4 !h-4 text-sm"
-                        [class.text-[#f07561]]="selectedBRaceId() !== race.id"
+                        [style.color]="selectedBRaceId() !== race.id ? '#f07561' : null"
                         [class.text-white]="selectedBRaceId() === race.id"
                       >flag</mat-icon>
                     </div>
