@@ -75,8 +75,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne(s => s.Week).WithMany(w => w.Sessions)
                 .HasForeignKey(s => s.WeekId)
                 .OnDelete(DeleteBehavior.Cascade);
-            e.Property(s => s.SessionType)
-                .HasColumnType("session_type");
         });
 
         modelBuilder.Entity<Race>(e =>
@@ -84,8 +82,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne(r => r.Plan).WithMany(p => p.Races)
                 .HasForeignKey(r => r.PlanId)
                 .OnDelete(DeleteBehavior.Cascade);
-            e.Property(r => r.Type)
-                .HasColumnType("race_type");
         });
     }
 }
