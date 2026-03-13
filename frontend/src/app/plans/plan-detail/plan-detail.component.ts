@@ -72,7 +72,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
       } @else {
 
         <!-- Hero header -->
-        <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+        <div class="text-white" style="background: linear-gradient(135deg, #1a0a2e 0%, #2d1458 50%, #1a0a2e 100%)">
           <div class="max-w-4xl mx-auto px-6 py-8">
             <a routerLink="/plans" class="inline-flex items-center gap-1.5 text-slate-400 hover:text-white text-sm transition-colors mb-6">
               <mat-icon class="!w-4 !h-4 text-sm">arrow_back</mat-icon>
@@ -118,7 +118,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                 @if (!plan()!.isActive) {
                   <button
                     mat-flat-button
-                    class="!bg-[#f07561] !text-white"
+                    class="!bg-[#e91e8c] !text-white"
                     (click)="activate()"
                     [disabled]="activating()"
                   >
@@ -139,7 +139,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                 [expanded]="isCurrentWeek(week)"
                 class="!rounded-2xl !shadow-none !border overflow-hidden"
                 [class.!border-slate-200]="!isCurrentWeek(week)"
-                [style.border-color]="isCurrentWeek(week) ? '#f07561' : null"
+                [style.border-color]="isCurrentWeek(week) ? '#e91e8c' : null"
                 [class.!shadow-md]="isCurrentWeek(week)"
                 [class.border-l-4]="week.isTaperWeek || week.isCutbackWeek"
                 [class.!border-l-blue-400]="week.isTaperWeek"
@@ -150,7 +150,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                     <!-- Week number circle -->
                     <span
                       class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                      [style.background-color]="isCurrentWeek(week) ? '#f07561' : null"
+                      [style.background-color]="isCurrentWeek(week) ? '#e91e8c' : null"
                       [class.text-white]="isCurrentWeek(week)"
                       [class.bg-slate-100]="!isCurrentWeek(week)"
                       [class.text-slate-600]="!isCurrentWeek(week)"
@@ -158,7 +158,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                     <span class="font-semibold text-slate-800 text-sm">
                       {{ week.startDate | date:'MMM d' }} – {{ weekEndDate(week.startDate) | date:'MMM d' }}
                       @if (isCurrentWeek(week)) {
-                        <span class="ml-2 text-[#f07561] text-xs font-medium">Current week</span>
+                        <span class="ml-2 text-[#e91e8c] text-xs font-medium">Current week</span>
                       }
                     </span>
                     @if (week.isTaperWeek) {
@@ -261,7 +261,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                           } @else {
                             <button
                               class="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-orange-50"
-                              [style.color]="!!session.stravaActivity ? '#f07561' : null"
+                              [style.color]="!!session.stravaActivity ? '#e91e8c' : null"
                               [class.text-slate-300]="!session.stravaActivity"
                               [matTooltip]="session.stravaActivity ? 'Change linked activity' : 'Link Strava activity'"
                               (click)="openActivityPicker(session, $event)"
@@ -290,7 +290,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                       <!-- Linked Strava bar -->
                       @if (session.stravaActivity) {
                         <div class="border-t border-emerald-100 bg-emerald-50/80 px-4 py-2 flex items-center gap-2">
-                          <mat-icon class="!w-3.5 !h-3.5 text-[#f07561] flex-shrink-0">directions_run</mat-icon>
+                          <mat-icon class="!w-3.5 !h-3.5 text-[#e91e8c] flex-shrink-0">directions_run</mat-icon>
                           <span class="text-xs text-emerald-800 font-semibold truncate flex-1">{{ session.stravaActivity.name }}</span>
                           <span class="text-xs text-emerald-600 flex-shrink-0">
                             {{ (session.stravaActivity.distance / 1000) | number:'1.1-2' }} km &middot; {{ session.stravaActivity.startDate | date:'MMM d' }}
@@ -313,19 +313,19 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                           @if (activitiesLoading()) {
                             <div class="flex items-center justify-center py-3"><mat-spinner diameter="20"></mat-spinner></div>
                           } @else if (filteredActivities().length === 0) {
-                            <p class="text-xs text-slate-400 py-2 text-center">No run activities found. <a routerLink="/strava" class="text-[#f07561] hover:underline">Sync from Strava</a> first.</p>
+                            <p class="text-xs text-slate-400 py-2 text-center">No run activities found. <a routerLink="/strava" class="text-[#e91e8c] hover:underline">Sync from Strava</a> first.</p>
                           } @else {
-                            <input type="text" placeholder="Search activities…" class="w-full text-xs border border-slate-200 rounded-lg px-3 py-1.5 mb-2 focus:outline-none focus:border-[#f07561] transition-colors" [(ngModel)]="activitySearchQuery" />
+                            <input type="text" placeholder="Search activities…" class="w-full text-xs border border-slate-200 rounded-lg px-3 py-1.5 mb-2 focus:outline-none focus:border-[#e91e8c] transition-colors" [(ngModel)]="activitySearchQuery" />
                             <div class="max-h-48 overflow-y-auto flex flex-col gap-0.5">
                               @for (act of filteredActivities(); track act.id) {
                                 <button
                                   class="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-orange-50 text-left transition-colors w-full"
                                   [class.bg-orange-50]="session.stravaActivityId === act.stravaId"
                                   [class.ring-1]="session.stravaActivityId === act.stravaId"
-                                  [style.outline]="session.stravaActivityId === act.stravaId ? '2px solid #f07561' : null"
+                                  [style.outline]="session.stravaActivityId === act.stravaId ? '2px solid #e91e8c' : null"
                                   (click)="linkActivity(session, act)"
                                 >
-                                  <mat-icon class="!w-3.5 !h-3.5 text-[#f07561] flex-shrink-0">directions_run</mat-icon>
+                                  <mat-icon class="!w-3.5 !h-3.5 text-[#e91e8c] flex-shrink-0">directions_run</mat-icon>
                                   <span class="text-xs text-slate-800 font-medium flex-1 truncate">{{ act.name }}</span>
                                   <span class="text-xs text-slate-400 flex-shrink-0">{{ (act.distance / 1000) | number:'1.1-1' }} km &middot; {{ act.startDate | date:'MMM d' }}</span>
                                 </button>
@@ -377,7 +377,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
               <div class="flex gap-3 flex-wrap mb-6">
                 @if (!showAddRaceForm()) {
                   <button
-                    class="border-2 border-dashed border-slate-200 rounded-2xl p-4 w-40 hover:border-[#f07561] hover:bg-orange-50/40 transition-all flex flex-col items-center justify-center gap-2 min-h-[110px] bg-white"
+                    class="border-2 border-dashed border-slate-200 rounded-2xl p-4 w-40 hover:border-[#e91e8c] hover:bg-pink-50 transition-all flex flex-col items-center justify-center gap-2 min-h-[110px] bg-white"
                     (click)="openAddRaceForm()"
                   >
                     <div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
@@ -392,8 +392,8 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                     class="rounded-2xl p-4 w-40 text-left transition-all flex flex-col gap-3 min-h-[110px] border"
                     [class.bg-white]="selectedBRaceId() !== race.id"
                     [class.border-slate-200]="selectedBRaceId() !== race.id"
-                    [class.bg-slate-900]="selectedBRaceId() === race.id"
-                    [class.border-slate-900]="selectedBRaceId() === race.id"
+                    [style.background]="selectedBRaceId() === race.id ? 'linear-gradient(135deg, #1a0a2e, #2d1458)' : null"
+                    [style.border-color]="selectedBRaceId() === race.id ? '#2d1458' : null"
                     [class.shadow-lg]="selectedBRaceId() === race.id"
                     (click)="selectBRace(race)"
                   >
@@ -404,7 +404,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                     >
                       <mat-icon
                         class="!w-4 !h-4 text-sm"
-                        [style.color]="selectedBRaceId() !== race.id ? '#f07561' : null"
+                        [style.color]="selectedBRaceId() !== race.id ? '#e91e8c' : null"
                         [class.text-white]="selectedBRaceId() === race.id"
                       >flag</mat-icon>
                     </div>
@@ -428,19 +428,19 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                   <div class="grid grid-cols-2 gap-4 mb-5">
                     <div class="col-span-2">
                       <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Race name</label>
-                      <input type="text" class="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-[#f07561] focus:ring-2 focus:ring-[#f07561]/10 transition-all" placeholder="e.g. Zandvoort Circuit Run 12K" [(ngModel)]="newRaceName" />
+                      <input type="text" class="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-[#e91e8c] focus:ring-2 focus:ring-[#e91e8c]/10 transition-all" placeholder="e.g. Zandvoort Circuit Run 12K" [(ngModel)]="newRaceName" />
                     </div>
                     <div>
                       <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Date</label>
-                      <input type="date" class="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-[#f07561] focus:ring-2 focus:ring-[#f07561]/10 transition-all" [(ngModel)]="newRaceDate" />
+                      <input type="date" class="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-[#e91e8c] focus:ring-2 focus:ring-[#e91e8c]/10 transition-all" [(ngModel)]="newRaceDate" />
                     </div>
                     <div>
                       <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Distance (km)</label>
-                      <input type="number" class="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-[#f07561] focus:ring-2 focus:ring-[#f07561]/10 transition-all" placeholder="12" min="0.1" max="500" [(ngModel)]="newRaceDistance" />
+                      <input type="number" class="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-[#e91e8c] focus:ring-2 focus:ring-[#e91e8c]/10 transition-all" placeholder="12" min="0.1" max="500" [(ngModel)]="newRaceDistance" />
                     </div>
                     <div class="col-span-2">
                       <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Approach</label>
-                      <select class="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-[#f07561] transition-all bg-white" [(ngModel)]="newRaceApproach">
+                      <select class="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-[#e91e8c] transition-all bg-white" [(ngModel)]="newRaceApproach">
                         <option value="Relaxed effort">Relaxed effort</option>
                         <option value="Strong and steady">Strong and steady</option>
                         <option value="Go all out">Go all out</option>
@@ -474,7 +474,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                       </div>
                       <div class="text-right flex-shrink-0">
                         @if (weeksUntilBRace(race.date) > 0) {
-                          <p class="text-2xl font-extrabold text-[#f07561]">{{ weeksUntilBRace(race.date) }}</p>
+                          <p class="text-2xl font-extrabold text-[#e91e8c]">{{ weeksUntilBRace(race.date) }}</p>
                           <p class="text-xs text-slate-400">weeks away</p>
                         } @else {
                           <p class="text-xs text-slate-400 mt-1">Past</p>
@@ -489,7 +489,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                       <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Approach</p>
                       @if (editingApproach()) {
                         <div class="flex items-center gap-2">
-                          <select class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#f07561] bg-white" [(ngModel)]="editingApproachValue">
+                          <select class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#e91e8c] bg-white" [(ngModel)]="editingApproachValue">
                             <option value="Relaxed effort">Relaxed effort</option>
                             <option value="Strong and steady">Strong and steady</option>
                             <option value="Go all out">Go all out</option>
@@ -551,14 +551,14 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                     </div>
 
                     <!-- AI section -->
-                    <div class="rounded-2xl bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-100 p-4 mb-4">
+                    <div class="rounded-2xl border p-4 mb-4" style="background: linear-gradient(135deg, #fce4ec, #ede7f6); border-color: #f8bbd9">
                       <div class="flex items-start gap-3">
-                        <div class="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center flex-shrink-0">
+                        <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background-color: #e91e8c">
                           <mat-icon class="text-white !w-5 !h-5">auto_awesome</mat-icon>
                         </div>
                         <div>
-                          <p class="text-sm font-semibold text-violet-900 mb-0.5">AI-powered adjustments</p>
-                          <p class="text-xs text-violet-700 leading-relaxed">Analyses the 3 weeks around your B-race and automatically adjusts session types and distances based on your chosen approach — so your training peaks and recovers at the right time.</p>
+                          <p class="text-sm font-semibold mb-0.5" style="color: #1a0a2e">AI-powered adjustments</p>
+                          <p class="text-xs leading-relaxed" style="color: #6b2d6b">Analyses the 3 weeks around your B-race and automatically adjusts session types and distances based on your chosen approach — so your training peaks and recovers at the right time.</p>
                         </div>
                       </div>
                     </div>
@@ -606,7 +606,7 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                     <!-- Actions row -->
                     <div class="flex items-center justify-between">
                       <button
-                        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+                        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm" style="background-color: #e91e8c"
                         [disabled]="rescheduling()"
                         (click)="applyAiReschedule(race)"
                       >
