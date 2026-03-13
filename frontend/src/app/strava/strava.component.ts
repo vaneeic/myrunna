@@ -5,7 +5,6 @@ import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -23,7 +22,6 @@ import { StravaService } from '../shared/services/strava.service';
     MatButtonModule,
     MatIconModule,
     MatTableModule,
-    MatChipsModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
     MatPaginatorModule,
@@ -88,9 +86,6 @@ import { StravaService } from '../shared/services/strava.service';
               <th mat-header-cell *matHeaderCellDef>Activity</th>
               <td mat-cell *matCellDef="let a">
                 <div class="font-medium">{{ a.name }}</div>
-                <mat-chip-set>
-                  <mat-chip class="text-xs">{{ a.type }}</mat-chip>
-                </mat-chip-set>
               </td>
             </ng-container>
 
