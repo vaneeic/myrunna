@@ -76,7 +76,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .HasForeignKey(s => s.WeekId)
                 .OnDelete(DeleteBehavior.Cascade);
             e.Property(s => s.SessionType)
-                .HasConversion<string>()
                 .HasColumnType("session_type");
         });
 
@@ -86,7 +85,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .HasForeignKey(r => r.PlanId)
                 .OnDelete(DeleteBehavior.Cascade);
             e.Property(r => r.Type)
-                .HasConversion<string>()
                 .HasColumnType("race_type");
         });
     }
