@@ -61,6 +61,15 @@ public class AiReschedulingService(
         if (!response.IsSuccessStatusCode)
         {
             logger.LogError("Claude API error {Status}: {Body}", (int)response.StatusCode, body);
+            // Try to surface the Anthropic error message directly
+            try
+            {
+                var errDoc = JsonDocument.Parse(body);
+                var msg = errDoc.RootElement.GetProperty("error").GetProperty("message").GetString();
+                if (!string.IsNullOrEmpty(msg)) throw new HttpRequestException(msg);
+            }
+            catch (HttpRequestException) { throw; }
+            catch { /* fall through to generic */ }
             throw new HttpRequestException($"AI service returned {(int)response.StatusCode}");
         }
 
