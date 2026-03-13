@@ -27,7 +27,7 @@ public class StravaService(AppDbContext db, StravaTokenService tokenService, ICo
                $"&state={state}";
     }
 
-    public async Task ExchangeCodeForTokensAsync(string code, Guid userId)
+    public async Task ExchangeCodeForTokensAsync(string code, Guid userId, string? callbackScope = null)
     {
         using var http = new HttpClient();
         var response = await http.PostAsync("https://www.strava.com/oauth/token", new FormUrlEncodedContent(new Dictionary<string, string>
@@ -41,6 +41,11 @@ public class StravaService(AppDbContext db, StravaTokenService tokenService, ICo
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
 
+        // Strava returns scope in the callback query string, not always in the token response body
+        var scope = callbackScope
+            ?? (json.TryGetProperty("scope", out var s) ? s.GetString() : null)
+            ?? "";
+
         await tokenService.SaveTokensAsync(
             userId,
             json.GetProperty("access_token").GetString()!,
@@ -48,7 +53,7 @@ public class StravaService(AppDbContext db, StravaTokenService tokenService, ICo
             json.GetProperty("expires_at").GetInt64(),
             json.GetProperty("athlete").GetProperty("id").GetInt64(),
             $"{json.GetProperty("athlete").GetProperty("firstname").GetString()} {json.GetProperty("athlete").GetProperty("lastname").GetString()}".Trim(),
-            json.GetProperty("scope").GetString()!
+            scope
         );
     }
 

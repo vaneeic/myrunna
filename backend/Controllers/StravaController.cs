@@ -23,7 +23,7 @@ public class StravaController(StravaService stravaService, IConfiguration config
         => Ok(new { url = stravaService.GetAuthorizationUrl(UserId) });
 
     [HttpGet("callback")]
-    public async Task<IActionResult> Callback([FromQuery] string? code, [FromQuery] string? state, [FromQuery] string? error)
+    public async Task<IActionResult> Callback([FromQuery] string? code, [FromQuery] string? state, [FromQuery] string? error, [FromQuery] string? scope)
     {
         if (error is not null || code is null || state is null)
             return Redirect($"{_frontendUrl}/settings?strava=denied");
@@ -33,7 +33,7 @@ public class StravaController(StravaService stravaService, IConfiguration config
 
         try
         {
-            await stravaService.ExchangeCodeForTokensAsync(code, userId);
+            await stravaService.ExchangeCodeForTokensAsync(code, userId, scope);
             return Redirect($"{_frontendUrl}/settings?strava=connected");
         }
         catch (Exception)
