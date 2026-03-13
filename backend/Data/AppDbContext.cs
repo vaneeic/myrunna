@@ -16,9 +16,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Enums stored as text (matching PostgreSQL)
-        modelBuilder.HasPostgresEnum<SessionType>();
-        modelBuilder.HasPostgresEnum<RaceType>();
 
         modelBuilder.Entity<User>(e =>
         {
@@ -75,6 +72,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne(s => s.Week).WithMany(w => w.Sessions)
                 .HasForeignKey(s => s.WeekId)
                 .OnDelete(DeleteBehavior.Cascade);
+            e.Property(s => s.SessionType).HasConversion<string>();
         });
 
         modelBuilder.Entity<Race>(e =>
@@ -82,6 +80,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasOne(r => r.Plan).WithMany(p => p.Races)
                 .HasForeignKey(r => r.PlanId)
                 .OnDelete(DeleteBehavior.Cascade);
+            e.Property(r => r.Type).HasConversion<string>();
         });
     }
 }

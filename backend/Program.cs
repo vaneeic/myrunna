@@ -57,14 +57,8 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
 });
 
 // ── Database ─────────────────────────────────────────────────────────────────
-var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(
-    builder.Configuration.GetConnectionString("DefaultConnection"));
-dataSourceBuilder.MapEnum<MyRunna.Api.Models.SessionType>("session_type");
-dataSourceBuilder.MapEnum<MyRunna.Api.Models.RaceType>("race_type");
-var dataSource = dataSourceBuilder.Build();
-
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(dataSource));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // ── JWT Authentication ────────────────────────────────────────────────────────
 var jwtSecret = builder.Configuration["Jwt:Secret"]
