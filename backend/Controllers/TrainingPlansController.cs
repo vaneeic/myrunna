@@ -103,6 +103,28 @@ public class TrainingPlansController(TrainingPlansService plansService, ILogger<
         }
     }
 
+    [HttpPost("{id:guid}/races/{raceId:guid}/reschedule")]
+    public async Task<IActionResult> RescheduleForBRace(Guid id, Guid raceId)
+    {
+        try
+        {
+            var plan = await plansService.ApplyBRaceRescheduleAsync(id, raceId, UserId);
+            return Ok(plan);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (HttpRequestException ex)
+        {
+            return StatusCode(503, new { message = ex.Message });
+        }
+    }
+
     [HttpDelete("{id:guid}/races/{raceId:guid}")]
     public async Task<IActionResult> DeleteRace(Guid id, Guid raceId)
     {

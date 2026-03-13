@@ -574,8 +574,24 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
                   </p>
                 </div>
 
-                <!-- Delete -->
-                <div class="mt-5 pt-4 border-t border-gray-100 flex justify-end">
+                <!-- AI Reschedule + Delete -->
+                <div class="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    [disabled]="rescheduling()"
+                    (click)="applyAiReschedule(race)"
+                  >
+                    @if (rescheduling()) {
+                      <mat-spinner diameter="16" class="inline-block mr-2"></mat-spinner>
+                      Rescheduling...
+                    } @else {
+                      <ng-container>
+                        <mat-icon>auto_awesome</mat-icon>
+                        Apply AI Adjustments
+                      </ng-container>
+                    }
+                  </button>
                   <button
                     class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 transition-colors"
                     (click)="deleteBRace(race)"
@@ -851,6 +867,7 @@ export class PlanDetailComponent implements OnInit {
   // ── B-races ───────────────────────────────────────────────────────────────
 
   readonly adaptTab = signal<'races'>('races');
+  readonly rescheduling = signal(false);
   readonly showAddRaceForm = signal(false);
   readonly selectedBRaceId = signal<string | null>(null);
   readonly savingRace = signal(false);
@@ -939,6 +956,23 @@ export class PlanDetailComponent implements OnInit {
       },
       error: () => {
         this.snackBar.open('Failed to delete B-race.', 'Close', { duration: 3000 });
+      },
+    });
+  }
+
+  applyAiReschedule(race: Race) {
+    this.rescheduling.set(true);
+    this.plansService.rescheduleForBRace(this.id, race.id).subscribe({
+      next: (updatedPlan) => {
+        this.plan.set(updatedPlan);
+        this._sessionsByWeek.set(this.plansService.groupSessionsByWeek(updatedPlan.sessions));
+        this.rescheduling.set(false);
+        this.snackBar.open('Plan adjusted around your B-race.', 'Close', { duration: 4000 });
+      },
+      error: (err: any) => {
+        this.rescheduling.set(false);
+        const msg = err?.error?.message || 'AI rescheduling failed. Check your API key.';
+        this.snackBar.open(msg, 'Close', { duration: 6000 });
       },
     });
   }

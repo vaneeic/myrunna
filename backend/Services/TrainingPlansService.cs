@@ -5,7 +5,7 @@ using MyRunna.Api.Models;
 
 namespace MyRunna.Api.Services;
 
-public class TrainingPlansService(AppDbContext db, GoogleCalendarService calendarService, ILogger<TrainingPlansService> logger)
+public class TrainingPlansService(AppDbContext db, GoogleCalendarService calendarService, AiReschedulingService aiRescheduler, ILogger<TrainingPlansService> logger)
 {
     // ── CRUD ─────────────────────────────────────────────────────────────────
 
@@ -279,6 +279,44 @@ public class TrainingPlansService(AppDbContext db, GoogleCalendarService calenda
 
     private static RaceDto MapRaceDto(Race r) => new(
         r.Id, r.PlanId, r.Name, r.Date, r.DistanceKm, r.Type.ToString(), r.Location, r.Approach, r.CreatedAt);
+
+    // ── AI rescheduling ───────────────────────────────────────────────────────
+
+    public async Task<PlanDetailDto> ApplyBRaceRescheduleAsync(Guid planId, Guid raceId, Guid userId)
+    {
+        var plan = await db.TrainingPlans
+            .Include(p => p.Weeks).ThenInclude(w => w.Sessions)
+            .Include(p => p.Races)
+            .FirstOrDefaultAsync(p => p.Id == planId && p.UserId == userId)
+            ?? throw new KeyNotFoundException("Plan not found.");
+
+        var bRace = plan.Races.FirstOrDefault(r => r.Id == raceId)
+            ?? throw new KeyNotFoundException("Race not found.");
+
+        var modifications = await aiRescheduler.GetModificationsAsync(planId, bRace);
+
+        var sessionMap = plan.Weeks
+            .SelectMany(w => w.Sessions)
+            .ToDictionary(s => s.Id);
+
+        foreach (var mod in modifications)
+        {
+            if (!sessionMap.TryGetValue(mod.SessionId, out var session)) continue;
+
+            if (mod.PlannedDistanceKm.HasValue)
+                session.PlannedDistanceKm = Math.Round(mod.PlannedDistanceKm.Value, 1);
+            if (mod.SessionType is not null && Enum.TryParse<SessionType>(mod.SessionType, out var st))
+                session.SessionType = st;
+            if (mod.Description is not null)
+                session.Description = mod.Description;
+
+            session.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync();
+
+        return (await GetOneAsync(planId, userId))!;
+    }
 
     // ── Race management ───────────────────────────────────────────────────────
 

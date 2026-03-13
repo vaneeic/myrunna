@@ -186,6 +186,10 @@ export class PlansService {
     );
   }
 
+  rescheduleForBRace(planId: string, raceId: string) {
+    return this.api.post<TrainingPlanDetail>(`/training-plans/${planId}/races/${raceId}/reschedule`, {});
+  }
+
   addRace(planId: string, payload: CreateRacePayload) {
     return this.api.post<Race>(`/training-plans/${planId}/races`, payload);
   }

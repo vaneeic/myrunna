@@ -54,6 +54,7 @@ builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
     ["Google:RedirectUri"] = Environment.GetEnvironmentVariable("GOOGLE_REDIRECT_URI"),
     ["Google:TokenEncryptionKey"] = Environment.GetEnvironmentVariable("GOOGLE_TOKEN_ENCRYPTION_KEY"),
     ["App:FrontendUrl"] = Environment.GetEnvironmentVariable("FRONTEND_URL") ?? "http://localhost:4200",
+    ["Anthropic:ApiKey"] = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY"),
 });
 
 // ── Database ─────────────────────────────────────────────────────────────────
@@ -95,6 +96,8 @@ builder.Services.AddScoped<StravaTokenService>();
 builder.Services.AddScoped<StravaService>();
 builder.Services.AddScoped<GoogleCalendarService>();
 builder.Services.AddScoped<TrainingPlansService>();
+builder.Services.AddScoped<AiReschedulingService>();
+builder.Services.AddHttpClient();
 builder.Services.AddHostedService<StravaSyncScheduler>();
 
 // ── Controllers + OpenAPI ─────────────────────────────────────────────────────
