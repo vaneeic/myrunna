@@ -9,7 +9,7 @@ namespace MyRunna.Api.Controllers;
 [ApiController]
 [Route("api/training-plans")]
 [Authorize]
-public class TrainingPlansController(TrainingPlansService plansService) : ControllerBase
+public class TrainingPlansController(TrainingPlansService plansService, ILogger<TrainingPlansController> logger) : ControllerBase
 {
     private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
         ?? User.FindFirstValue("sub")!);
@@ -35,7 +35,15 @@ public class TrainingPlansController(TrainingPlansService plansService) : Contro
         }
         catch (Exception ex)
         {
-            return BadRequest(new { message = ex.Message });
+            var inner = ex.InnerException;
+            logger.LogError(ex, "Failed to create plan for user {UserId}", UserId);
+            return BadRequest(new {
+                message = ex.Message,
+                inner = inner?.Message,
+                type = ex.GetType().FullName,
+                innerType = inner?.GetType().FullName,
+                trace = ex.StackTrace
+            });
         }
     }
 

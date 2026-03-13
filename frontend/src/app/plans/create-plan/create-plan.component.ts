@@ -237,8 +237,10 @@ export class CreatePlanComponent {
           this.router.navigate(['/plans', plan.id]);
         },
         error: (err) => {
-          console.error('Failed to create plan:', err);
-          this.error.set(err.error?.message || 'Failed to create plan. Please try again.');
+          console.error('Failed to create plan:', err?.error);
+          const inner = err?.error?.inner ? ` | Inner: ${err.error.inner}` : '';
+          const type = err?.error?.innerType || err?.error?.type || '';
+          this.error.set(`${err.error?.message || 'Failed to create plan.'}${inner} [${type}]`);
           this.loading.set(false);
         },
       });
