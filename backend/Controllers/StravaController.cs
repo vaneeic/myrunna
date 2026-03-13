@@ -78,7 +78,7 @@ public class StravaController(StravaService stravaService, IConfiguration config
         catch (Exception ex)
         {
             logger.LogError(ex, "Strava sync failed for user {UserId}", UserId);
-            return StatusCode(500, new { message = ex.Message });
+            return StatusCode(500, new { message = ex.Message, type = ex.GetType().FullName, trace = ex.StackTrace });
         }
     }
 

@@ -433,7 +433,10 @@ export class SettingsComponent implements OnInit {
       },
       error: (err: any) => {
         const msg = err?.error?.message || err?.message || 'Sync failed. Please try again.';
-        this.snackBar.open(`Sync failed: ${msg}`, 'Close', { duration: 10000 });
+        const type = err?.error?.type ? ` [${err.error.type}]` : '';
+        const trace = err?.error?.trace ? `\n${err.error.trace}` : '';
+        console.error('Sync error:', err?.error);
+        this.snackBar.open(`Sync failed: ${msg}${type}`, 'Close', { duration: 15000 });
       },
     });
   }
