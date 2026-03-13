@@ -1,6 +1,9 @@
 // Angular Material theme (@use must come first in SCSS)
 @use '@angular/material' as mat;
 
+// Google Fonts
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+
 // Tailwind directives
 @tailwind base;
 @tailwind components;
@@ -10,8 +13,8 @@
 html {
   @include mat.theme((
     color: (
-      primary: mat.$green-palette,
-      tertiary: mat.$orange-palette,
+      primary: mat.$deep-orange-palette,
+      tertiary: mat.$indigo-palette,
     ),
     typography: Inter,
     density: 0,
@@ -25,9 +28,13 @@ html, body {
 }
 
 body {
-  font-family: Inter, Roboto, 'Helvetica Neue', sans-serif;
-  background-color: #fafafa;
-  color: #1a1a1a;
+  font-family: 'Inter', Roboto, 'Helvetica Neue', sans-serif;
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Manrope', 'Inter', sans-serif;
 }
 
 // Utility: hide scrollbar but keep scroll functionality

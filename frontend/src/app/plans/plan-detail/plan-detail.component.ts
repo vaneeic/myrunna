@@ -55,554 +55,589 @@ import { StravaService, StravaActivity } from '../../shared/services/strava.serv
     DragDropModule,
   ],
   template: `
-    <div class="p-6 max-w-4xl mx-auto">
+    <div class="min-h-screen bg-slate-50">
       @if (loading()) {
-        <div class="flex items-center justify-center py-16">
-          <mat-spinner diameter="40"></mat-spinner>
+        <div class="flex items-center justify-center py-32">
+          <mat-spinner diameter="36"></mat-spinner>
         </div>
       } @else if (!plan()) {
-        <mat-card class="p-8 text-center">
-          <mat-icon class="text-5xl text-gray-300 mb-4 block">error_outline</mat-icon>
-          <h3 class="text-lg font-medium mb-2">Plan not found</h3>
-          <a mat-stroked-button routerLink="/plans">Back to plans</a>
-        </mat-card>
+        <div class="max-w-2xl mx-auto px-6 py-16 text-center">
+          <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <mat-icon class="text-slate-400 !w-8 !h-8 text-3xl">search_off</mat-icon>
+          </div>
+          <h3 class="text-lg font-semibold text-slate-800 mb-1">Plan not found</h3>
+          <p class="text-sm text-slate-500 mb-6">This plan doesn't exist or you don't have access.</p>
+          <a mat-flat-button routerLink="/plans">Back to plans</a>
+        </div>
       } @else {
-        <!-- Header -->
-        <div class="mb-6">
-          <a routerLink="/plans" class="text-sm text-gray-500 hover:underline flex items-center gap-1 w-fit mb-3">
-            <mat-icon class="text-sm !w-4 !h-4">arrow_back</mat-icon>
-            Back to plans
-          </a>
-          <div class="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <div class="flex items-center gap-2 mb-1">
-                <h1 class="text-2xl font-bold">{{ plan()!.name }}</h1>
-                @if (plan()!.isActive) {
-                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                    <mat-icon class="!w-3 !h-3 text-xs">check_circle</mat-icon>
-                    Active
-                  </span>
+
+        <!-- Hero header -->
+        <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+          <div class="max-w-4xl mx-auto px-6 py-8">
+            <a routerLink="/plans" class="inline-flex items-center gap-1.5 text-slate-400 hover:text-white text-sm transition-colors mb-6">
+              <mat-icon class="!w-4 !h-4 text-sm">arrow_back</mat-icon>
+              All plans
+            </a>
+            <div class="flex items-start justify-between gap-6 flex-wrap">
+              <div>
+                <div class="flex items-center gap-3 mb-2">
+                  <h1 class="text-3xl font-extrabold tracking-tight" style="font-family: Manrope, Inter, sans-serif">{{ plan()!.name }}</h1>
+                  @if (plan()!.isActive) {
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+                      Active
+                    </span>
+                  }
+                </div>
+                <p class="text-slate-300 text-sm mb-4">{{ plan()!.goalEvent }} &middot; {{ plan()!.goalDate | date:'MMMM d, yyyy' }}</p>
+                <!-- Stats row -->
+                <div class="flex gap-4 flex-wrap">
+                  <div class="bg-white/10 rounded-xl px-4 py-2.5">
+                    <p class="text-xs text-slate-400 uppercase tracking-wide font-medium">Weeks</p>
+                    <p class="text-xl font-bold">{{ plan()!.weeks.length }}</p>
+                  </div>
+                  <div class="bg-white/10 rounded-xl px-4 py-2.5">
+                    <p class="text-xs text-slate-400 uppercase tracking-wide font-medium">Peak volume</p>
+                    <p class="text-xl font-bold">{{ peakVolumeKm() | number:'1.0-1' }} <span class="text-sm font-normal text-slate-300">km/wk</span></p>
+                  </div>
+                  <div class="bg-white/10 rounded-xl px-4 py-2.5">
+                    <p class="text-xs text-slate-400 uppercase tracking-wide font-medium">B-races</p>
+                    <p class="text-xl font-bold">{{ bRaces().length }}</p>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <a
+                  mat-stroked-button
+                  [routerLink]="['/plans', plan()!.id, 'calendar']"
+                  class="!text-white !border-white/30 hover:!bg-white/10"
+                >
+                  <mat-icon>calendar_month</mat-icon>
+                  Calendar
+                </a>
+                @if (!plan()!.isActive) {
+                  <button
+                    mat-flat-button
+                    class="!bg-[#f07561] !text-white"
+                    (click)="activate()"
+                    [disabled]="activating()"
+                  >
+                    Set as active
+                  </button>
                 }
               </div>
-              <p class="text-gray-600">
-                {{ plan()!.goalEvent }}
-                &middot;
-                {{ plan()!.goalDate | date:'longDate' }}
-              </p>
-              <p class="text-sm text-gray-400 mt-1">
-                {{ plan()!.weeks.length }} weeks
-                &middot;
-                Peak ~{{ peakVolumeKm() | number:'1.0-1' }} km/week
-              </p>
-            </div>
-            <div class="flex items-center gap-2">
-              <a
-                mat-stroked-button
-                [routerLink]="['/plans', plan()!.id, 'calendar']"
-              >
-                <mat-icon>calendar_month</mat-icon>
-                Calendar view
-              </a>
-              @if (!plan()!.isActive) {
-                <button
-                  mat-stroked-button
-                  color="primary"
-                  (click)="activate()"
-                  [disabled]="activating()"
-                >
-                  Set as active
-                </button>
-              }
             </div>
           </div>
         </div>
 
-        <!-- Weeks -->
-        <div class="flex flex-col gap-3">
-          @for (week of plan()!.weeks; track week.id) {
-            <mat-expansion-panel
-              [expanded]="isCurrentWeek(week)"
-              class="rounded-lg overflow-hidden"
-              [class.border-l-4]="week.isTaperWeek || week.isCutbackWeek"
-              [class.border-blue-400]="week.isTaperWeek"
-              [class.border-yellow-400]="week.isCutbackWeek && !week.isTaperWeek"
-            >
-              <mat-expansion-panel-header class="py-3">
-                <mat-panel-title class="flex items-center gap-2 font-medium">
-                  Week {{ week.weekNumber }}
-                  @if (week.isTaperWeek) {
-                    <span class="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">Taper</span>
-                  } @else if (week.isCutbackWeek) {
-                    <span class="px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-700">Recovery</span>
-                  }
-                </mat-panel-title>
-                <mat-panel-description class="text-sm">
-                  {{ week.startDate | date:'MMM d' }}
-                  &nbsp;&middot;&nbsp;
-                  {{ week.weeklyVolumeKm | number:'1.0-1' }} km planned
-                  @if (completedSessionCount(week.id) > 0) {
-                    &nbsp;&middot;&nbsp;
-                    <span class="text-green-600">{{ completedSessionCount(week.id) }}/{{ weekSessionCount(week.id) }} done</span>
-                  }
-                  @if (skippedSessionCount(week.id) > 0) {
-                    &nbsp;&middot;&nbsp;
-                    <span class="text-amber-600">{{ skippedSessionCount(week.id) }} skipped</span>
-                  }
-                </mat-panel-description>
-              </mat-expansion-panel-header>
+        <div class="max-w-4xl mx-auto px-6 py-8">
 
-              @if (week.focus) {
-                <p class="text-sm text-gray-500 italic mb-4 px-1">{{ week.focus }}</p>
-              }
-
-              <!-- Sessions drag-and-drop list -->
-              <div
-                cdkDropList
-                [cdkDropListData]="sessionsForWeek(week.id)"
-                (cdkDropListDropped)="onDrop($event, week)"
-                class="flex flex-col gap-2 min-h-[40px]"
+          <!-- Weeks -->
+          <div class="flex flex-col gap-2 mb-10">
+            @for (week of plan()!.weeks; track week.id) {
+              <mat-expansion-panel
+                [expanded]="isCurrentWeek(week)"
+                class="!rounded-2xl !shadow-none !border overflow-hidden"
+                [class.!border-slate-200]="!isCurrentWeek(week)"
+                [class.!border-[#f07561]]="isCurrentWeek(week)"
+                [class.!shadow-md]="isCurrentWeek(week)"
+                [class.border-l-4]="week.isTaperWeek || week.isCutbackWeek"
+                [class.!border-l-blue-400]="week.isTaperWeek"
+                [class.!border-l-amber-400]="week.isCutbackWeek && !week.isTaperWeek"
               >
-                @for (session of sessionsForWeek(week.id); track session.id) {
-                  <div
-                    cdkDrag
-                    class="session-card group relative rounded-lg border transition-all cursor-grab active:cursor-grabbing overflow-hidden"
-                    [class.border-gray-200]="!session.skipped && !session.stravaActivity"
-                    [class.bg-white]="!session.skipped && !session.stravaActivity"
-                    [class.hover:border-gray-300]="!session.skipped"
-                    [class.hover:shadow-sm]="!session.skipped"
-                    [class.border-amber-200]="session.skipped"
-                    [class.bg-amber-50]="session.skipped"
-                    [class.border-green-200]="!session.skipped && !!session.stravaActivity"
-                    [class.bg-green-50]="!session.skipped && !!session.stravaActivity"
-                    [class.opacity-60]="session.completed && !session.stravaActivity"
-                  >
-                    <!-- Main row -->
-                    <div class="flex items-start gap-3 p-3">
-                      <!-- Drag handle -->
-                      <div cdkDragHandle class="mt-0.5 cursor-grab text-gray-300 hover:text-gray-500 transition-colors flex-shrink-0">
-                        <mat-icon class="!w-4 !h-4 text-sm">drag_indicator</mat-icon>
-                      </div>
+                <mat-expansion-panel-header class="!py-4 !px-5">
+                  <mat-panel-title class="flex items-center gap-3">
+                    <!-- Week number circle -->
+                    <span
+                      class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                      [class.bg-[#f07561]]="isCurrentWeek(week)"
+                      [class.text-white]="isCurrentWeek(week)"
+                      [class.bg-slate-100]="!isCurrentWeek(week)"
+                      [class.text-slate-600]="!isCurrentWeek(week)"
+                    >{{ week.weekNumber }}</span>
+                    <span class="font-semibold text-slate-800 text-sm">
+                      {{ week.startDate | date:'MMM d' }} – {{ weekEndDate(week.startDate) | date:'MMM d' }}
+                      @if (isCurrentWeek(week)) {
+                        <span class="ml-2 text-[#f07561] text-xs font-medium">Current week</span>
+                      }
+                    </span>
+                    @if (week.isTaperWeek) {
+                      <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Taper</span>
+                    } @else if (week.isCutbackWeek) {
+                      <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Recovery</span>
+                    }
+                  </mat-panel-title>
+                  <mat-panel-description class="flex items-center gap-3 text-xs text-slate-500">
+                    <span class="font-semibold text-slate-700">{{ week.weeklyVolumeKm | number:'1.0-1' }} km</span>
+                    @if (completedSessionCount(week.id) > 0) {
+                      <span class="text-emerald-600 font-medium">{{ completedSessionCount(week.id) }}/{{ weekSessionCount(week.id) }} done</span>
+                    }
+                    @if (skippedSessionCount(week.id) > 0) {
+                      <span class="text-amber-600">{{ skippedSessionCount(week.id) }} skipped</span>
+                    }
+                  </mat-panel-description>
+                </mat-expansion-panel-header>
 
-                      <!-- Session type badge -->
-                      <span
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 mt-0.5"
-                        [class]="sessionConfig(session.sessionType).bgColor + ' ' + sessionConfig(session.sessionType).color"
-                      >
-                        <mat-icon class="!w-3 !h-3 text-xs">{{ sessionConfig(session.sessionType).icon }}</mat-icon>
-                        {{ sessionConfig(session.sessionType).label }}
-                      </span>
+                @if (week.focus) {
+                  <p class="text-xs text-slate-400 italic mb-3 px-5">{{ week.focus }}</p>
+                }
 
-                      <!-- Session content -->
-                      <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-3 flex-wrap">
-                          <span
-                            class="text-sm font-medium"
-                            [class.text-gray-800]="!session.skipped"
-                            [class.text-amber-800]="session.skipped"
-                          >
-                            {{ session.date | date:'EEE, MMM d' }}
-                          </span>
-                          @if (session.plannedDistanceKm) {
-                            <span class="text-sm text-gray-600">
-                              {{ session.plannedDistanceKm | number:'1.0-1' }} km
-                            </span>
-                          }
-                          @if (session.plannedDurationMin) {
-                            <span class="text-sm text-gray-500">
-                              {{ session.plannedDurationMin }} min
-                            </span>
-                          }
-                          @if (session.skipped) {
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
-                              <mat-icon class="!w-3 !h-3">block</mat-icon>
-                              Skipped
-                            </span>
+                <!-- Sessions -->
+                <div
+                  cdkDropList
+                  [cdkDropListData]="sessionsForWeek(week.id)"
+                  (cdkDropListDropped)="onDrop($event, week)"
+                  class="flex flex-col gap-1.5 px-3 pb-3 min-h-[40px]"
+                >
+                  @for (session of sessionsForWeek(week.id); track session.id) {
+                    <div
+                      cdkDrag
+                      class="session-card group relative rounded-xl border transition-all cursor-grab active:cursor-grabbing overflow-hidden bg-white"
+                      [class.border-slate-100]="!session.skipped && !session.stravaActivity"
+                      [class.hover:border-slate-200]="!session.skipped"
+                      [class.hover:shadow-sm]="!session.skipped"
+                      [class.border-amber-200]="session.skipped"
+                      [class.bg-amber-50/60]="session.skipped"
+                      [class.border-emerald-200]="!session.skipped && !!session.stravaActivity"
+                      [class.bg-emerald-50/40]="!session.skipped && !!session.stravaActivity"
+                      [class.opacity-50]="session.completed && !session.stravaActivity"
+                    >
+                      <!-- Colored left accent bar -->
+                      <div
+                        class="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
+                        [class.bg-green-400]="session.sessionType === 'easy_run'"
+                        [class.bg-blue-500]="session.sessionType === 'long_run'"
+                        [class.bg-orange-500]="session.sessionType === 'tempo'"
+                        [class.bg-rose-500]="session.sessionType === 'intervals'"
+                        [class.bg-teal-400]="session.sessionType === 'recovery'"
+                        [class.bg-violet-500]="session.sessionType === 'race'"
+                        [class.bg-slate-300]="session.sessionType === 'rest'"
+                      ></div>
+
+                      <!-- Main row -->
+                      <div class="flex items-center gap-3 pl-4 pr-3 py-3">
+                        <!-- Drag handle -->
+                        <div cdkDragHandle class="cursor-grab text-slate-200 hover:text-slate-400 transition-colors flex-shrink-0">
+                          <mat-icon class="!w-4 !h-4 text-sm">drag_indicator</mat-icon>
+                        </div>
+
+                        <!-- Date -->
+                        <span class="text-xs font-semibold text-slate-400 w-14 flex-shrink-0">
+                          {{ session.date | date:'EEE d' }}
+                        </span>
+
+                        <!-- Session type badge -->
+                        <span
+                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold flex-shrink-0"
+                          [class]="sessionConfig(session.sessionType).bgColor + ' ' + sessionConfig(session.sessionType).color"
+                        >
+                          {{ sessionConfig(session.sessionType).label }}
+                        </span>
+
+                        <!-- Description -->
+                        <div class="flex-1 min-w-0">
+                          @if (session.description) {
+                            <p class="text-xs text-slate-500 truncate">{{ session.description }}</p>
                           }
                         </div>
-                        @if (session.description) {
-                          <p class="text-xs text-gray-500 mt-0.5 leading-relaxed">{{ session.description }}</p>
-                        }
+
+                        <!-- Distance / duration -->
+                        <div class="flex items-center gap-2 flex-shrink-0 text-xs text-slate-600 font-medium">
+                          @if (session.plannedDistanceKm) {
+                            <span>{{ session.plannedDistanceKm | number:'1.0-1' }} km</span>
+                          }
+                          @if (session.plannedDurationMin) {
+                            <span class="text-slate-400">{{ session.plannedDurationMin }}min</span>
+                          }
+                          @if (session.skipped) {
+                            <span class="px-1.5 py-0.5 rounded-md text-xs bg-amber-100 text-amber-700 font-semibold">Skipped</span>
+                          }
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="flex items-center gap-0.5 flex-shrink-0">
+                          @if (session.skipped) {
+                            <button class="w-7 h-7 flex items-center justify-center rounded-lg text-amber-500 hover:bg-amber-100 transition-colors" matTooltip="Undo skip" (click)="unskipSession(session, $event)">
+                              <mat-icon class="!w-4 !h-4 text-sm">undo</mat-icon>
+                            </button>
+                          } @else {
+                            <button
+                              class="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
+                              [class.text-[#f07561]]="!!session.stravaActivity"
+                              [class.text-slate-300]="!session.stravaActivity"
+                              [class.hover:bg-orange-50]="true"
+                              [matTooltip]="session.stravaActivity ? 'Change linked activity' : 'Link Strava activity'"
+                              (click)="openActivityPicker(session, $event)"
+                            >
+                              <mat-icon class="!w-4 !h-4 text-sm">link</mat-icon>
+                            </button>
+                            <button class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-300 hover:text-amber-500 hover:bg-amber-50 transition-colors" matTooltip="Skip session" (click)="skipSession(session, $event)">
+                              <mat-icon class="!w-4 !h-4 text-sm">block</mat-icon>
+                            </button>
+                            <button
+                              class="flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all"
+                              [class.border-emerald-500]="session.completed"
+                              [class.bg-emerald-500]="session.completed"
+                              [class.border-slate-200]="!session.completed"
+                              [class.hover:border-emerald-400]="!session.completed"
+                              [matTooltip]="session.completed ? 'Mark incomplete' : 'Mark complete'"
+                              (click)="toggleComplete(session, $event)"
+                            >
+                              @if (session.completed) {
+                                <mat-icon class="!w-3 !h-3 text-white text-xs">check</mat-icon>
+                              }
+                            </button>
+                          }
+                        </div>
                       </div>
 
-                      <!-- Action buttons -->
-                      <div class="flex items-center gap-1 flex-shrink-0 mt-0.5">
-                        @if (session.skipped) {
-                          <!-- Undo skip -->
-                          <button
-                            class="w-7 h-7 flex items-center justify-center rounded-full text-amber-500 hover:bg-amber-100 transition-colors"
-                            matTooltip="Undo skip"
-                            (click)="unskipSession(session, $event)"
-                          >
-                            <mat-icon class="!w-4 !h-4 text-sm">undo</mat-icon>
+                      <!-- Linked Strava bar -->
+                      @if (session.stravaActivity) {
+                        <div class="border-t border-emerald-100 bg-emerald-50/80 px-4 py-2 flex items-center gap-2">
+                          <mat-icon class="!w-3.5 !h-3.5 text-[#f07561] flex-shrink-0">directions_run</mat-icon>
+                          <span class="text-xs text-emerald-800 font-semibold truncate flex-1">{{ session.stravaActivity.name }}</span>
+                          <span class="text-xs text-emerald-600 flex-shrink-0">
+                            {{ (session.stravaActivity.distance / 1000) | number:'1.1-2' }} km &middot; {{ session.stravaActivity.startDate | date:'MMM d' }}
+                          </span>
+                          <button class="text-slate-400 hover:text-rose-500 flex-shrink-0 transition-colors" matTooltip="Unlink" (click)="unlinkActivity(session, $event)">
+                            <mat-icon class="!w-3.5 !h-3.5">link_off</mat-icon>
                           </button>
+                        </div>
+                      }
+
+                      <!-- Activity picker -->
+                      @if (pickingSessionId() === session.id) {
+                        <div class="border-t border-slate-100 bg-white px-4 py-3" (click)="$event.stopPropagation()">
+                          <div class="flex items-center justify-between mb-2.5">
+                            <span class="text-xs font-semibold text-slate-700">Link a Strava activity</span>
+                            <button class="w-5 h-5 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded" (click)="pickingSessionId.set(null)">
+                              <mat-icon class="!w-4 !h-4">close</mat-icon>
+                            </button>
+                          </div>
+                          @if (activitiesLoading()) {
+                            <div class="flex items-center justify-center py-3"><mat-spinner diameter="20"></mat-spinner></div>
+                          } @else if (filteredActivities().length === 0) {
+                            <p class="text-xs text-slate-400 py-2 text-center">No run activities found. <a routerLink="/strava" class="text-[#f07561] hover:underline">Sync from Strava</a> first.</p>
+                          } @else {
+                            <input type="text" placeholder="Search activities…" class="w-full text-xs border border-slate-200 rounded-lg px-3 py-1.5 mb-2 focus:outline-none focus:border-[#f07561] transition-colors" [(ngModel)]="activitySearchQuery" />
+                            <div class="max-h-48 overflow-y-auto flex flex-col gap-0.5">
+                              @for (act of filteredActivities(); track act.id) {
+                                <button
+                                  class="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-orange-50 text-left transition-colors w-full"
+                                  [class.bg-orange-50]="session.stravaActivityId === act.stravaId"
+                                  [class.ring-1]="session.stravaActivityId === act.stravaId"
+                                  [class.ring-[#f07561]]="session.stravaActivityId === act.stravaId"
+                                  (click)="linkActivity(session, act)"
+                                >
+                                  <mat-icon class="!w-3.5 !h-3.5 text-[#f07561] flex-shrink-0">directions_run</mat-icon>
+                                  <span class="text-xs text-slate-800 font-medium flex-1 truncate">{{ act.name }}</span>
+                                  <span class="text-xs text-slate-400 flex-shrink-0">{{ (act.distance / 1000) | number:'1.1-1' }} km &middot; {{ act.startDate | date:'MMM d' }}</span>
+                                </button>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
+                  } @empty {
+                    <p class="text-xs text-slate-400 text-center py-6">No sessions this week.</p>
+                  }
+                </div>
+              </mat-expansion-panel>
+            }
+          </div>
+
+          <!-- ── Adapt Your Plan ─────────────────────────────────── -->
+          <div>
+            <div class="flex items-center gap-3 mb-5">
+              <h2 class="text-xl font-bold text-slate-900" style="font-family: Manrope, Inter, sans-serif">Adapt Your Plan</h2>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex gap-2 mb-6 flex-wrap">
+              <button
+                class="px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+                [class.bg-slate-900]="adaptTab() === 'races'"
+                [class.text-white]="adaptTab() === 'races'"
+                [class.shadow-md]="adaptTab() === 'races'"
+                [class.bg-white]="adaptTab() !== 'races'"
+                [class.text-slate-600]="adaptTab() !== 'races'"
+                [class.border]="adaptTab() !== 'races'"
+                [class.border-slate-200]="adaptTab() !== 'races'"
+                (click)="adaptTab.set('races')"
+              >
+                <span class="flex items-center gap-1.5"><mat-icon class="!w-4 !h-4 text-sm">flag</mat-icon> B-races</span>
+              </button>
+              <button class="px-4 py-2 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-300 cursor-not-allowed flex items-center gap-1.5" disabled>
+                <mat-icon class="!w-4 !h-4 text-sm">beach_access</mat-icon> Vacations
+              </button>
+              <button class="px-4 py-2 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-300 cursor-not-allowed flex items-center gap-1.5" disabled>
+                <mat-icon class="!w-4 !h-4 text-sm">sentiment_dissatisfied</mat-icon> Not feeling 100%
+              </button>
+            </div>
+
+            @if (adaptTab() === 'races') {
+              <!-- Race cards row -->
+              <div class="flex gap-3 flex-wrap mb-6">
+                @if (!showAddRaceForm()) {
+                  <button
+                    class="border-2 border-dashed border-slate-200 rounded-2xl p-4 w-40 hover:border-[#f07561] hover:bg-orange-50/40 transition-all flex flex-col items-center justify-center gap-2 min-h-[110px] bg-white"
+                    (click)="openAddRaceForm()"
+                  >
+                    <div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
+                      <mat-icon class="text-slate-400">add</mat-icon>
+                    </div>
+                    <span class="text-xs text-slate-500 text-center font-medium leading-tight">Add a B-race</span>
+                  </button>
+                }
+
+                @for (race of bRaces(); track race.id) {
+                  <button
+                    class="rounded-2xl p-4 w-40 text-left transition-all flex flex-col gap-3 min-h-[110px] border"
+                    [class.bg-white]="selectedBRaceId() !== race.id"
+                    [class.border-slate-200]="selectedBRaceId() !== race.id"
+                    [class.hover:border-slate-300]="selectedBRaceId() !== race.id"
+                    [class.hover:shadow-sm]="selectedBRaceId() !== race.id"
+                    [class.bg-slate-900]="selectedBRaceId() === race.id"
+                    [class.border-slate-900]="selectedBRaceId() === race.id"
+                    [class.shadow-lg]="selectedBRaceId() === race.id"
+                    (click)="selectBRace(race)"
+                  >
+                    <div
+                      class="w-8 h-8 rounded-xl flex items-center justify-center"
+                      [class.bg-slate-100]="selectedBRaceId() !== race.id"
+                      [class.bg-white/15]="selectedBRaceId() === race.id"
+                    >
+                      <mat-icon
+                        class="!w-4 !h-4 text-sm"
+                        [class.text-[#f07561]]="selectedBRaceId() !== race.id"
+                        [class.text-white]="selectedBRaceId() === race.id"
+                      >flag</mat-icon>
+                    </div>
+                    <div>
+                      <p class="text-sm font-bold leading-tight line-clamp-2" [class.text-slate-800]="selectedBRaceId() !== race.id" [class.text-white]="selectedBRaceId() === race.id">{{ race.name }}</p>
+                      <p class="text-xs mt-1 font-medium" [class.text-slate-400]="selectedBRaceId() !== race.id" [class.text-slate-400]="selectedBRaceId() === race.id">{{ race.date | date:'MMM d, yyyy' }}</p>
+                    </div>
+                  </button>
+                }
+              </div>
+
+              <!-- Add B-race form -->
+              @if (showAddRaceForm()) {
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
+                  <div class="flex items-center justify-between mb-5">
+                    <h3 class="font-bold text-slate-900" style="font-family: Manrope, Inter, sans-serif">Add a B-race</h3>
+                    <button class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors" (click)="showAddRaceForm.set(false)">
+                      <mat-icon class="!w-4 !h-4">close</mat-icon>
+                    </button>
+                  </div>
+                  <div class="grid grid-cols-2 gap-4 mb-5">
+                    <div class="col-span-2">
+                      <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Race name</label>
+                      <input type="text" class="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-[#f07561] focus:ring-2 focus:ring-[#f07561]/10 transition-all" placeholder="e.g. Zandvoort Circuit Run 12K" [(ngModel)]="newRaceName" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Date</label>
+                      <input type="date" class="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-[#f07561] focus:ring-2 focus:ring-[#f07561]/10 transition-all" [(ngModel)]="newRaceDate" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Distance (km)</label>
+                      <input type="number" class="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-[#f07561] focus:ring-2 focus:ring-[#f07561]/10 transition-all" placeholder="12" min="0.1" max="500" [(ngModel)]="newRaceDistance" />
+                    </div>
+                    <div class="col-span-2">
+                      <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Approach</label>
+                      <select class="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-[#f07561] transition-all bg-white" [(ngModel)]="newRaceApproach">
+                        <option value="Relaxed effort">Relaxed effort</option>
+                        <option value="Strong and steady">Strong and steady</option>
+                        <option value="Go all out">Go all out</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="flex justify-end gap-2">
+                    <button mat-stroked-button class="!rounded-xl" (click)="showAddRaceForm.set(false)">Cancel</button>
+                    <button
+                      class="px-5 py-2 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                      [disabled]="!newRaceName || !newRaceDate || !newRaceDistance || savingRace()"
+                      (click)="addBRace()"
+                    >
+                      @if (savingRace()) { <mat-spinner diameter="14" class="inline-block"></mat-spinner> }
+                      Add B-race
+                    </button>
+                  </div>
+                </div>
+              }
+
+              <!-- B-race detail panel -->
+              @if (selectedBRace(); as race) {
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <!-- Panel header -->
+                  <div class="bg-gradient-to-r from-slate-900 to-slate-800 px-6 py-5 text-white">
+                    <div class="flex items-start justify-between gap-4">
+                      <div>
+                        <p class="text-xs text-slate-400 uppercase tracking-wide font-semibold mb-1">B-race</p>
+                        <h3 class="text-lg font-bold" style="font-family: Manrope, Inter, sans-serif">{{ race.name }}</h3>
+                        <p class="text-sm text-slate-300 mt-0.5">{{ race.date | date:'EEEE, MMMM d, yyyy' }} &middot; {{ race.distanceKm }} km</p>
+                      </div>
+                      <div class="text-right flex-shrink-0">
+                        @if (weeksUntilBRace(race.date) > 0) {
+                          <p class="text-2xl font-extrabold text-[#f07561]">{{ weeksUntilBRace(race.date) }}</p>
+                          <p class="text-xs text-slate-400">weeks away</p>
                         } @else {
-                          <!-- Link Strava activity button -->
-                          <button
-                            class="w-7 h-7 flex items-center justify-center rounded-full transition-colors"
-                            [class.text-orange-500]="!!session.stravaActivity"
-                            [class.text-gray-300]="!session.stravaActivity"
-                            [class.hover:text-orange-500]="!session.stravaActivity"
-                            [class.hover:bg-orange-50]="true"
-                            [matTooltip]="session.stravaActivity ? 'Change linked activity' : 'Link Strava activity'"
-                            (click)="openActivityPicker(session, $event)"
-                          >
-                            <mat-icon class="!w-4 !h-4 text-sm">link</mat-icon>
-                          </button>
-
-                          <!-- Skip button -->
-                          <button
-                            class="w-7 h-7 flex items-center justify-center rounded-full text-gray-300 hover:text-amber-500 hover:bg-amber-50 transition-colors"
-                            matTooltip="Mark as skipped"
-                            (click)="skipSession(session, $event)"
-                          >
-                            <mat-icon class="!w-4 !h-4 text-sm">block</mat-icon>
-                          </button>
-
-                          <!-- Complete toggle -->
-                          <button
-                            class="flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors"
-                            [class.border-green-500]="session.completed"
-                            [class.bg-green-500]="session.completed"
-                            [class.border-gray-300]="!session.completed"
-                            [matTooltip]="session.completed ? 'Mark incomplete' : 'Mark complete'"
-                            (click)="toggleComplete(session, $event)"
-                          >
-                            @if (session.completed) {
-                              <mat-icon class="!w-3 !h-3 text-white text-xs">check</mat-icon>
-                            }
-                          </button>
+                          <p class="text-xs text-slate-400 mt-1">Past</p>
                         }
                       </div>
                     </div>
+                  </div>
 
-                    <!-- Linked Strava activity bar -->
-                    @if (session.stravaActivity) {
-                      <div class="border-t border-green-100 bg-green-50 px-3 py-2 flex items-center gap-2">
-                        <mat-icon class="!w-3.5 !h-3.5 text-orange-500 flex-shrink-0">directions_run</mat-icon>
-                        <span class="text-xs text-green-800 font-medium truncate flex-1">
-                          {{ session.stravaActivity.name }}
-                        </span>
-                        <span class="text-xs text-green-600 flex-shrink-0">
-                          {{ (session.stravaActivity.distance / 1000) | number:'1.1-2' }} km
-                          &middot;
-                          {{ session.stravaActivity.startDate | date:'MMM d' }}
-                        </span>
+                  <div class="p-6">
+                    <!-- Approach -->
+                    <div class="mb-6">
+                      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Approach</p>
+                      @if (editingApproach()) {
+                        <div class="flex items-center gap-2">
+                          <select class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#f07561] bg-white" [(ngModel)]="editingApproachValue">
+                            <option value="Relaxed effort">Relaxed effort</option>
+                            <option value="Strong and steady">Strong and steady</option>
+                            <option value="Go all out">Go all out</option>
+                          </select>
+                          <button class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 text-white" (click)="saveApproach(race)">Save</button>
+                          <button class="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600" (click)="editingApproach.set(false)">Cancel</button>
+                        </div>
+                      } @else {
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center gap-3">
+                            <span
+                              class="px-3 py-1.5 rounded-xl text-sm font-semibold"
+                              [class.bg-green-100]="race.approach === 'Relaxed effort'"
+                              [class.text-green-700]="race.approach === 'Relaxed effort'"
+                              [class.bg-blue-100]="race.approach === 'Strong and steady' || !race.approach"
+                              [class.text-blue-700]="race.approach === 'Strong and steady' || !race.approach"
+                              [class.bg-rose-100]="race.approach === 'Go all out'"
+                              [class.text-rose-700]="race.approach === 'Go all out'"
+                            >{{ race.approach || 'Strong and steady' }}</span>
+                            <span class="text-xs text-slate-400">{{ trainingDisruption(race.approach || 'Strong and steady') }} disruption</span>
+                          </div>
+                          <button class="w-8 h-8 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors" (click)="startEditApproach(race)">
+                            <mat-icon class="!w-4 !h-4 text-sm">edit</mat-icon>
+                          </button>
+                        </div>
+                      }
+                    </div>
+
+                    <!-- Adjustment insight tabs -->
+                    <div class="mb-6">
+                      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Adjustment Insight</p>
+                      <div class="flex gap-1.5 mb-4 bg-slate-100 p-1 rounded-xl w-fit">
                         <button
-                          class="text-xs text-gray-400 hover:text-red-500 flex-shrink-0 ml-1"
-                          matTooltip="Unlink activity"
-                          (click)="unlinkActivity(session, $event)"
-                        >
-                          <mat-icon class="!w-3.5 !h-3.5">link_off</mat-icon>
-                        </button>
+                          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                          [class.bg-white]="selectedAdjustTab() === 'pre'"
+                          [class.text-slate-800]="selectedAdjustTab() === 'pre'"
+                          [class.shadow-sm]="selectedAdjustTab() === 'pre'"
+                          [class.text-slate-500]="selectedAdjustTab() !== 'pre'"
+                          (click)="selectedAdjustTab.set('pre')"
+                        >Pre-race</button>
+                        <button
+                          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                          [class.bg-white]="selectedAdjustTab() === 'race'"
+                          [class.text-slate-800]="selectedAdjustTab() === 'race'"
+                          [class.shadow-sm]="selectedAdjustTab() === 'race'"
+                          [class.text-slate-500]="selectedAdjustTab() !== 'race'"
+                          (click)="selectedAdjustTab.set('race')"
+                        >Race week</button>
+                        <button
+                          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                          [class.bg-white]="selectedAdjustTab() === 'post'"
+                          [class.text-slate-800]="selectedAdjustTab() === 'post'"
+                          [class.shadow-sm]="selectedAdjustTab() === 'post'"
+                          [class.text-slate-500]="selectedAdjustTab() !== 'post'"
+                          (click)="selectedAdjustTab.set('post')"
+                        >Recovery</button>
                       </div>
-                    }
+                      <p class="text-sm text-slate-600 leading-relaxed">{{ adjustmentText(race.approach || 'Strong and steady', selectedAdjustTab()) }}</p>
+                    </div>
 
-                    <!-- Activity picker (shown inline when selecting) -->
-                    @if (pickingSessionId() === session.id) {
-                      <div class="border-t border-gray-200 bg-white px-3 py-2" (click)="$event.stopPropagation()">
-                        <div class="flex items-center justify-between mb-2">
-                          <span class="text-xs font-medium text-gray-600">Link a Strava activity</span>
-                          <button class="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600" (click)="pickingSessionId.set(null)">
+                    <!-- AI section -->
+                    <div class="rounded-2xl bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-100 p-4 mb-4">
+                      <div class="flex items-start gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center flex-shrink-0">
+                          <mat-icon class="text-white !w-5 !h-5">auto_awesome</mat-icon>
+                        </div>
+                        <div>
+                          <p class="text-sm font-semibold text-violet-900 mb-0.5">AI-powered adjustments</p>
+                          <p class="text-xs text-violet-700 leading-relaxed">Analyses the 3 weeks around your B-race and automatically adjusts session types and distances based on your chosen approach — so your training peaks and recovers at the right time.</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Diff panel -->
+                    @if (sessionDiffs().length > 0) {
+                      <div class="rounded-2xl border border-slate-200 overflow-hidden mb-4">
+                        <div class="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
+                          <div class="flex items-center gap-2">
+                            <span class="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                              <mat-icon class="text-white !w-3 !h-3 text-xs">check</mat-icon>
+                            </span>
+                            <span class="text-xs font-semibold text-slate-700">{{ sessionDiffs().length }} session{{ sessionDiffs().length !== 1 ? 's' : '' }} updated</span>
+                          </div>
+                          <button class="text-slate-400 hover:text-slate-600 transition-colors" (click)="sessionDiffs.set([])">
                             <mat-icon class="!w-4 !h-4">close</mat-icon>
                           </button>
                         </div>
-                        @if (activitiesLoading()) {
-                          <div class="flex items-center justify-center py-3">
-                            <mat-spinner diameter="20"></mat-spinner>
-                          </div>
-                        } @else if (filteredActivities().length === 0) {
-                          <p class="text-xs text-gray-400 py-2 text-center">
-                            No run activities found. <a routerLink="/strava" class="text-orange-500 hover:underline">Sync from Strava</a> first.
-                          </p>
-                        } @else {
-                          <!-- Search box -->
-                          <input
-                            type="text"
-                            placeholder="Search activities…"
-                            class="w-full text-xs border border-gray-200 rounded px-2 py-1 mb-2 focus:outline-none focus:border-orange-400"
-                            [(ngModel)]="activitySearchQuery"
-                          />
-                          <div class="max-h-48 overflow-y-auto flex flex-col gap-1">
-                            @for (act of filteredActivities(); track act.id) {
-                              <button
-                                class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-orange-50 text-left transition-colors w-full"
-                                [class.bg-orange-50]="session.stravaActivityId === act.stravaId"
-                                [class.ring-1]="session.stravaActivityId === act.stravaId"
-                                [class.ring-orange-300]="session.stravaActivityId === act.stravaId"
-                                (click)="linkActivity(session, act)"
-                              >
-                                <mat-icon class="!w-3.5 !h-3.5 text-orange-400 flex-shrink-0">directions_run</mat-icon>
-                                <span class="text-xs text-gray-800 font-medium flex-1 truncate">{{ act.name }}</span>
-                                <span class="text-xs text-gray-500 flex-shrink-0">
-                                  {{ (act.distance / 1000) | number:'1.1-1' }} km &middot; {{ act.startDate | date:'MMM d' }}
-                                </span>
-                              </button>
-                            }
-                          </div>
-                        }
+                        <div class="divide-y divide-slate-100 max-h-60 overflow-y-auto">
+                          @for (diff of sessionDiffs(); track diff.sessionId) {
+                            <div class="px-4 py-3 flex items-start gap-3">
+                              <span class="text-xs font-semibold text-slate-400 w-12 flex-shrink-0 mt-0.5">{{ diff.date | date:'MMM d' }}</span>
+                              <div class="flex-1 flex flex-wrap items-center gap-2">
+                                @if (diff.typeChanged) {
+                                  <div class="flex items-center gap-1.5 text-xs">
+                                    <span class="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-500 line-through">{{ sessionConfig(diff.oldType!).label }}</span>
+                                    <mat-icon class="!w-3 !h-3 text-slate-400">arrow_forward</mat-icon>
+                                    <span class="px-2 py-0.5 rounded-lg" [class]="sessionConfig(diff.newType!).bgColor + ' ' + sessionConfig(diff.newType!).color + ' font-semibold'">{{ sessionConfig(diff.newType!).label }}</span>
+                                  </div>
+                                }
+                                @if (diff.distanceChanged) {
+                                  <div class="flex items-center gap-1 text-xs text-slate-500">
+                                    <span class="line-through">{{ diff.oldDistance | number:'1.0-1' }}km</span>
+                                    <mat-icon class="!w-3 !h-3">arrow_forward</mat-icon>
+                                    <span class="font-semibold" [class.text-emerald-600]="diff.newDistance! > diff.oldDistance!" [class.text-rose-600]="diff.newDistance! < diff.oldDistance!">{{ diff.newDistance | number:'1.0-1' }}km</span>
+                                  </div>
+                                }
+                              </div>
+                            </div>
+                          }
+                        </div>
                       </div>
                     }
+
+                    <!-- Actions row -->
+                    <div class="flex items-center justify-between">
+                      <button
+                        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+                        [disabled]="rescheduling()"
+                        (click)="applyAiReschedule(race)"
+                      >
+                        @if (rescheduling()) {
+                          <mat-spinner diameter="14" class="inline-block"></mat-spinner>
+                          Adjusting plan…
+                        } @else {
+                          <mat-icon class="!w-4 !h-4">auto_awesome</mat-icon>
+                          Apply AI Adjustments
+                        }
+                      </button>
+                      <button
+                        class="text-xs text-slate-400 hover:text-rose-500 flex items-center gap-1 transition-colors"
+                        (click)="deleteBRace(race)"
+                      >
+                        <mat-icon class="!w-3.5 !h-3.5 text-sm">delete</mat-icon>
+                        Remove
+                      </button>
+                    </div>
                   </div>
-                } @empty {
-                  <p class="text-sm text-gray-400 text-center py-4">No sessions scheduled for this week.</p>
-                }
-              </div>
-            </mat-expansion-panel>
-          }
-        </div>
-
-        <!-- Adapt Your Plan -->
-        <div class="mt-8">
-          <h2 class="text-lg font-semibold mb-3">Adapt Your Plan</h2>
-
-          <!-- Tab buttons -->
-          <div class="flex gap-2 mb-4 flex-wrap">
-            <button
-              class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
-              [class.bg-black]="adaptTab() === 'races'"
-              [class.text-white]="adaptTab() === 'races'"
-              [class.bg-gray-100]="adaptTab() !== 'races'"
-              [class.text-gray-700]="adaptTab() !== 'races'"
-              (click)="adaptTab.set('races')"
-            >B-races</button>
-            <button class="px-4 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-400 cursor-not-allowed" disabled>
-              Vacations
-            </button>
-            <button class="px-4 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-400 cursor-not-allowed" disabled>
-              Not feeling 100%
-            </button>
+                </div>
+              }
+            }
           </div>
 
-          <!-- B-races tab -->
-          @if (adaptTab() === 'races') {
-            <div class="flex gap-3 flex-wrap">
-              <!-- Add B-race card -->
-              @if (!showAddRaceForm()) {
-                <button
-                  class="border-2 border-dashed border-gray-300 rounded-xl p-4 w-36 hover:border-gray-400 transition-colors flex flex-col items-center justify-center gap-2 min-h-[100px] bg-transparent"
-                  (click)="openAddRaceForm()"
-                >
-                  <mat-icon class="text-gray-400">add</mat-icon>
-                  <span class="text-sm text-gray-500 text-center leading-tight">Add a B-race</span>
-                </button>
-              }
-
-              <!-- Existing B-race cards -->
-              @for (race of bRaces(); track race.id) {
-                <button
-                  class="border rounded-xl p-4 w-36 text-left transition-all flex flex-col gap-2 min-h-[100px] hover:shadow-sm"
-                  [class.border-gray-200]="selectedBRaceId() !== race.id"
-                  [class.bg-white]="selectedBRaceId() !== race.id"
-                  [class.border-gray-900]="selectedBRaceId() === race.id"
-                  [class.shadow-md]="selectedBRaceId() === race.id"
-                  (click)="selectBRace(race)"
-                >
-                  <mat-icon class="text-gray-500 !w-5 !h-5 text-lg">flag</mat-icon>
-                  <div>
-                    <p class="text-sm font-medium leading-tight line-clamp-2">{{ race.name }}</p>
-                    <p class="text-xs text-gray-500 uppercase mt-0.5">{{ race.date | date:'MMM d, yyyy' }}</p>
-                  </div>
-                </button>
-              }
-            </div>
-
-            <!-- Add B-race form -->
-            @if (showAddRaceForm()) {
-              <mat-card class="mt-4 p-4">
-                <div class="flex items-center justify-between mb-4">
-                  <h3 class="font-medium">Add a B-race</h3>
-                  <button class="text-gray-400 hover:text-gray-600" (click)="showAddRaceForm.set(false)">
-                    <mat-icon>close</mat-icon>
-                  </button>
-                </div>
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                  <div class="col-span-2">
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Race name</label>
-                    <input
-                      type="text"
-                      class="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:border-gray-400"
-                      placeholder="e.g. Zandvoort Circuit Run 12K"
-                      [(ngModel)]="newRaceName"
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Date</label>
-                    <input
-                      type="date"
-                      class="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:border-gray-400"
-                      [(ngModel)]="newRaceDate"
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Distance (km)</label>
-                    <input
-                      type="number"
-                      class="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:border-gray-400"
-                      placeholder="12"
-                      min="0.1"
-                      max="500"
-                      [(ngModel)]="newRaceDistance"
-                    />
-                  </div>
-                  <div class="col-span-2">
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Approach</label>
-                    <select
-                      class="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:border-gray-400 bg-white"
-                      [(ngModel)]="newRaceApproach"
-                    >
-                      <option value="Relaxed effort">Relaxed effort</option>
-                      <option value="Strong and steady">Strong and steady</option>
-                      <option value="Go all out">Go all out</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="flex justify-end gap-2">
-                  <button mat-stroked-button (click)="showAddRaceForm.set(false)">Cancel</button>
-                  <button
-                    mat-flat-button
-                    color="primary"
-                    [disabled]="!newRaceName || !newRaceDate || !newRaceDistance || savingRace()"
-                    (click)="addBRace()"
-                  >
-                    @if (savingRace()) {
-                      <mat-spinner diameter="16" class="inline-block mr-1"></mat-spinner>
-                    }
-                    Add B-race
-                  </button>
-                </div>
-              </mat-card>
-            }
-
-            <!-- B-race detail panel -->
-            @if (selectedBRace(); as race) {
-              <mat-card class="mt-4 p-5">
-                <!-- B-Race Details -->
-                <div class="mb-5">
-                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">B-Race Details</p>
-                  <div class="grid grid-cols-2 gap-3 mb-3">
-                    <div class="bg-gray-50 rounded-lg p-3">
-                      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Race</p>
-                      <p class="text-sm font-medium">{{ race.name }}</p>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-3">
-                      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Date</p>
-                      <p class="text-sm font-medium">{{ race.date | date:'MMM d, yyyy' }}</p>
-                    </div>
-                  </div>
-                  <div class="bg-gray-50 rounded-lg p-3 mb-2">
-                    <div class="flex items-center justify-between mb-1">
-                      <p class="text-xs text-gray-500 uppercase tracking-wide">Approach</p>
-                      @if (!editingApproach()) {
-                        <button class="text-gray-400 hover:text-gray-600 transition-colors" (click)="startEditApproach(race)">
-                          <mat-icon class="!w-4 !h-4 text-sm">edit</mat-icon>
-                        </button>
-                      }
-                    </div>
-                    @if (editingApproach()) {
-                      <div class="flex items-center gap-2 mt-1">
-                        <select
-                          class="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-gray-400 bg-white"
-                          [(ngModel)]="editingApproachValue"
-                        >
-                          <option value="Relaxed effort">Relaxed effort</option>
-                          <option value="Strong and steady">Strong and steady</option>
-                          <option value="Go all out">Go all out</option>
-                        </select>
-                        <button
-                          class="text-xs px-3 py-1 bg-gray-900 text-white rounded"
-                          (click)="saveApproach(race)"
-                        >Save</button>
-                        <button
-                          class="text-xs px-3 py-1 border border-gray-300 rounded"
-                          (click)="editingApproach.set(false)"
-                        >Cancel</button>
-                      </div>
-                    } @else {
-                      <p class="text-sm font-medium">{{ race.approach || 'Strong and steady' }}</p>
-                    }
-                  </div>
-                  <p class="text-xs text-gray-400">
-                    {{ race.distanceKm }} km
-                    @if (weeksUntilBRace(race.date) > 0) {
-                      &nbsp;&middot;&nbsp;In {{ weeksUntilBRace(race.date) }} {{ weeksUntilBRace(race.date) === 1 ? 'week' : 'weeks' }}
-                    } @else {
-                      &nbsp;&middot;&nbsp;<span class="text-gray-400">Past</span>
-                    }
-                  </p>
-                </div>
-
-                <!-- Adjustment Overview -->
-                <div>
-                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Adjustment Overview</p>
-                  <div class="bg-gray-50 rounded-lg p-3 mb-4 flex items-center gap-3">
-                    <mat-icon class="!w-4 !h-4 text-gray-500 text-sm flex-shrink-0">timelapse</mat-icon>
-                    <div>
-                      <p class="text-xs text-gray-500 uppercase tracking-wide">Training Disruption</p>
-                      <p class="text-sm font-medium">{{ trainingDisruption(race.approach || 'Strong and steady') }}</p>
-                    </div>
-                  </div>
-
-                  <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Adjustment Insight</p>
-                  <div class="flex gap-2 mb-3 flex-wrap">
-                    <button
-                      class="px-3 py-1 rounded-full text-xs font-medium transition-colors"
-                      [class.bg-red-100]="selectedAdjustTab() === 'pre'"
-                      [class.text-red-700]="selectedAdjustTab() === 'pre'"
-                      [class.bg-gray-100]="selectedAdjustTab() !== 'pre'"
-                      [class.text-gray-600]="selectedAdjustTab() !== 'pre'"
-                      (click)="selectedAdjustTab.set('pre')"
-                    >Pre B-Race Week</button>
-                    <button
-                      class="px-3 py-1 rounded-full text-xs font-medium transition-colors"
-                      [class.bg-gray-200]="selectedAdjustTab() === 'race'"
-                      [class.text-gray-700]="selectedAdjustTab() === 'race'"
-                      [class.bg-gray-100]="selectedAdjustTab() !== 'race'"
-                      [class.text-gray-600]="selectedAdjustTab() !== 'race'"
-                      (click)="selectedAdjustTab.set('race')"
-                    >B-Race Week</button>
-                    <button
-                      class="px-3 py-1 rounded-full text-xs font-medium transition-colors"
-                      [class.bg-gray-200]="selectedAdjustTab() === 'post'"
-                      [class.text-gray-700]="selectedAdjustTab() === 'post'"
-                      [class.bg-gray-100]="selectedAdjustTab() !== 'post'"
-                      [class.text-gray-600]="selectedAdjustTab() !== 'post'"
-                      (click)="selectedAdjustTab.set('post')"
-                    >Post B-Race Week</button>
-                  </div>
-                  <p class="text-sm text-gray-600 leading-relaxed">
-                    {{ adjustmentText(race.approach || 'Strong and steady', selectedAdjustTab()) }}
-                  </p>
-                </div>
-
-                <!-- AI Reschedule + Delete -->
-                <div class="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
-                  <button
-                    mat-flat-button
-                    color="primary"
-                    [disabled]="rescheduling()"
-                    (click)="applyAiReschedule(race)"
-                  >
-                    @if (rescheduling()) {
-                      <mat-spinner diameter="16" class="inline-block mr-2"></mat-spinner>
-                      Rescheduling...
-                    } @else {
-                      <ng-container>
-                        <mat-icon>auto_awesome</mat-icon>
-                        Apply AI Adjustments
-                      </ng-container>
-                    }
-                  </button>
-                  <button
-                    class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 transition-colors"
-                    (click)="deleteBRace(race)"
-                  >
-                    <mat-icon class="!w-3.5 !h-3.5 text-sm">delete</mat-icon>
-                    Remove B-race
-                  </button>
-                </div>
-              </mat-card>
-            }
-          }
         </div>
       }
     </div>
@@ -868,6 +903,18 @@ export class PlanDetailComponent implements OnInit {
 
   readonly adaptTab = signal<'races'>('races');
   readonly rescheduling = signal(false);
+  readonly sessionDiffs = signal<Array<{
+    sessionId: string;
+    date: string;
+    typeChanged: boolean;
+    oldType: TrainingSession['sessionType'] | null;
+    newType: TrainingSession['sessionType'] | null;
+    distanceChanged: boolean;
+    oldDistance: number | null;
+    newDistance: number | null;
+    descriptionChanged: boolean;
+    newDescription: string | null;
+  }>>([]);
   readonly showAddRaceForm = signal(false);
   readonly selectedBRaceId = signal<string | null>(null);
   readonly savingRace = signal(false);
@@ -899,6 +946,7 @@ export class PlanDetailComponent implements OnInit {
     this.editingApproach.set(false);
     this.selectedBRaceId.set(this.selectedBRaceId() === race.id ? null : race.id);
     this.selectedAdjustTab.set('pre');
+    this.sessionDiffs.set([]);
   }
 
   addBRace() {
@@ -962,12 +1010,37 @@ export class PlanDetailComponent implements OnInit {
 
   applyAiReschedule(race: Race) {
     this.rescheduling.set(true);
+    this.sessionDiffs.set([]);
+    const oldSessions = this.plan()?.sessions ?? [];
     this.plansService.rescheduleForBRace(this.id, race.id).subscribe({
       next: (updatedPlan) => {
+        // Compute diffs
+        const oldMap = new Map(oldSessions.map((s) => [s.id, s]));
+        const diffs = updatedPlan.sessions.flatMap((s) => {
+          const old = oldMap.get(s.id);
+          if (!old) return [];
+          const typeChanged = old.sessionType !== s.sessionType;
+          const distanceChanged = old.plannedDistanceKm !== s.plannedDistanceKm;
+          const descriptionChanged = old.description !== s.description;
+          if (!typeChanged && !distanceChanged && !descriptionChanged) return [];
+          return [{
+            sessionId: s.id,
+            date: s.date,
+            typeChanged,
+            oldType: typeChanged ? old.sessionType : null,
+            newType: typeChanged ? s.sessionType : null,
+            distanceChanged,
+            oldDistance: distanceChanged ? old.plannedDistanceKm : null,
+            newDistance: distanceChanged ? s.plannedDistanceKm : null,
+            descriptionChanged,
+            newDescription: descriptionChanged ? s.description : null,
+          }];
+        });
         this.plan.set(updatedPlan);
         this._sessionsByWeek.set(this.plansService.groupSessionsByWeek(updatedPlan.sessions));
+        this.sessionDiffs.set(diffs);
         this.rescheduling.set(false);
-        this.snackBar.open('Plan adjusted around your B-race.', 'Close', { duration: 4000 });
+        this.snackBar.open(`Plan adjusted — ${diffs.length} session${diffs.length !== 1 ? 's' : ''} changed.`, 'Close', { duration: 4000 });
       },
       error: (err: any) => {
         this.rescheduling.set(false);
@@ -975,6 +1048,12 @@ export class PlanDetailComponent implements OnInit {
         this.snackBar.open(msg, 'Close', { duration: 6000 });
       },
     });
+  }
+
+  weekEndDate(startDate: string): Date {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + 6);
+    return d;
   }
 
   weeksUntilBRace(dateStr: string): number {
