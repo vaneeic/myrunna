@@ -4,7 +4,6 @@ import { RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -23,7 +22,6 @@ import { ShareCardComponent } from './share-card/share-card.component';
     MatCardModule,
     MatButtonModule,
     MatIconModule,
-    MatTableModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
     MatPaginatorModule,
@@ -31,174 +29,134 @@ import { ShareCardComponent } from './share-card/share-card.component';
     ShareCardComponent,
   ],
   template: `
-    <div class="p-6 max-w-5xl mx-auto">
-      <div class="flex items-center justify-between mb-6">
+    <div class="p-4 md:p-6 max-w-5xl mx-auto">
+
+      <!-- Header -->
+      <div class="flex items-start justify-between mb-5">
         <div>
-          <h1 class="text-2xl font-bold">Strava Activities</h1>
+          <h1 class="text-2xl font-bold">Activities</h1>
           @if (strava.status().lastSyncedAt) {
-            <p class="text-sm text-gray-500 mt-1">
+            <p class="text-xs text-gray-400 mt-0.5">
               Last synced: {{ strava.status().lastSyncedAt | date:'medium' }}
             </p>
           }
         </div>
-        <button
-          mat-raised-button
-          color="primary"
-          (click)="syncActivities()"
-          [disabled]="strava.syncing()"
-        >
+        <button mat-stroked-button (click)="syncActivities()" [disabled]="strava.syncing()"
+          style="color:#e91e8c;border-color:#e91e8c" class="flex-shrink-0">
           @if (strava.syncing()) {
-            <mat-spinner diameter="18" class="inline-block mr-2"></mat-spinner>
-            Syncing...
+            <mat-spinner diameter="16" style="--mdc-circular-progress-active-indicator-color:#e91e8c"></mat-spinner>
+            Syncing…
           } @else {
-            <mat-icon>sync</mat-icon>
-            Sync Activities
+            <mat-icon>sync</mat-icon> Sync
           }
         </button>
       </div>
 
       <!-- Not connected banner -->
       @if (strava.status().connected === false) {
-        <mat-card class="p-6 text-center mb-6">
-          <mat-icon class="text-orange-500 text-5xl mb-3" style="font-size:48px;width:48px;height:48px;">
-            fitness_center
-          </mat-icon>
-          <p class="text-gray-700 font-medium mb-1">Strava not connected</p>
-          <p class="text-gray-500 text-sm mb-4">
-            Connect your Strava account to import your runs automatically.
-          </p>
-          <a mat-raised-button color="accent" routerLink="/settings"
-            style="background-color: #FC4C02; color: white;">
-            Connect Strava
-          </a>
-        </mat-card>
+        <div class="rounded-2xl bg-orange-50 border border-orange-200 p-5 flex gap-4 items-start mb-5">
+          <mat-icon style="color:#FC4C02;flex-shrink:0">fitness_center</mat-icon>
+          <div>
+            <p class="font-semibold text-gray-800 text-sm">Strava not connected</p>
+            <p class="text-gray-500 text-xs mt-0.5 mb-3">Connect your Strava account to sync runs automatically.</p>
+            <a mat-raised-button routerLink="/settings" style="background:#FC4C02;color:white;font-size:13px">
+              Connect Strava
+            </a>
+          </div>
+        </div>
       }
 
-      <!-- Activities table -->
+      <!-- Activity cards -->
       @if (strava.activities().length > 0) {
-        <mat-card>
-          <table mat-table [dataSource]="strava.activities()" class="w-full">
 
-            <ng-container matColumnDef="date">
-              <th mat-header-cell *matHeaderCellDef>Date</th>
-              <td mat-cell *matCellDef="let a">
-                {{ a.startDate | date:'mediumDate' }}
-              </td>
-            </ng-container>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          @for (a of strava.activities(); track a.id) {
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col gap-3 hover:shadow-md transition-shadow">
 
-            <ng-container matColumnDef="name">
-              <th mat-header-cell *matHeaderCellDef>Activity</th>
-              <td mat-cell *matCellDef="let a">
-                <div class="font-medium">{{ a.name }}</div>
-              </td>
-            </ng-container>
-
-            <ng-container matColumnDef="distance">
-              <th mat-header-cell *matHeaderCellDef>Distance</th>
-              <td mat-cell *matCellDef="let a">
-                {{ (a.distance / 1000) | number:'1.2-2' }} km
-              </td>
-            </ng-container>
-
-            <ng-container matColumnDef="time">
-              <th mat-header-cell *matHeaderCellDef>Time</th>
-              <td mat-cell *matCellDef="let a">{{ formatTime(a.movingTime) }}</td>
-            </ng-container>
-
-            <ng-container matColumnDef="avgPace">
-              <th mat-header-cell *matHeaderCellDef>Avg Pace</th>
-              <td mat-cell *matCellDef="let a">
-                {{ formatPace(a.distance, a.movingTime) }}
-              </td>
-            </ng-container>
-
-            <ng-container matColumnDef="heartrate">
-              <th mat-header-cell *matHeaderCellDef>Avg HR</th>
-              <td mat-cell *matCellDef="let a">
-                @if (a.averageHeartrate) {
-                  {{ a.averageHeartrate | number:'1.0-0' }} bpm
-                } @else {
-                  <span class="text-gray-400">—</span>
-                }
-              </td>
-            </ng-container>
-
-            <ng-container matColumnDef="suffer">
-              <th mat-header-cell *matHeaderCellDef>Suffer Score</th>
-              <td mat-cell *matCellDef="let a">
-                @if (a.sufferScore) {
-                  {{ a.sufferScore }}
-                } @else {
-                  <span class="text-gray-400">—</span>
-                }
-              </td>
-            </ng-container>
-
-            <ng-container matColumnDef="share">
-              <th mat-header-cell *matHeaderCellDef></th>
-              <td mat-cell *matCellDef="let a">
-                <button
-                  mat-icon-button
-                  matTooltip="Generate share card"
+              <!-- Top row: name + share -->
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-gray-900 text-sm leading-tight truncate">{{ a.name }}</p>
+                  <p class="text-xs text-gray-400 mt-0.5">{{ a.startDate | date:'d MMM yyyy' }}</p>
+                </div>
+                <button class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-100 hover:bg-pink-50 hover:border-pink-200 transition-colors"
                   [disabled]="sharingId() === a.id"
+                  matTooltip="Create share card"
                   (click)="openShareCard(a)"
-                  style="color: #e91e8c;"
-                >
+                  style="color:#e91e8c;background:transparent">
                   @if (sharingId() === a.id) {
-                    <mat-spinner diameter="18"></mat-spinner>
+                    <mat-spinner diameter="14" style="--mdc-circular-progress-active-indicator-color:#e91e8c"></mat-spinner>
                   } @else {
-                    <mat-icon>ios_share</mat-icon>
+                    <mat-icon class="!w-4 !h-4 text-base">ios_share</mat-icon>
                   }
                 </button>
-              </td>
-            </ng-container>
+              </div>
 
-            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50"></tr>
-          </table>
+              <!-- Stats row -->
+              <div class="grid grid-cols-4 gap-1 pt-2 border-t border-gray-50">
+                <div class="flex flex-col items-center">
+                  <span class="text-[10px] text-gray-400 uppercase tracking-wide">Dist</span>
+                  <span class="text-sm font-bold text-gray-800 mt-0.5">{{ (a.distance / 1000) | number:'1.1-1' }}</span>
+                  <span class="text-[10px] text-gray-400">km</span>
+                </div>
+                <div class="flex flex-col items-center">
+                  <span class="text-[10px] text-gray-400 uppercase tracking-wide">Pace</span>
+                  <span class="text-sm font-bold text-gray-800 mt-0.5">{{ formatPace(a.distance, a.movingTime) }}</span>
+                </div>
+                <div class="flex flex-col items-center">
+                  <span class="text-[10px] text-gray-400 uppercase tracking-wide">Time</span>
+                  <span class="text-sm font-bold text-gray-800 mt-0.5">{{ formatTime(a.movingTime) }}</span>
+                </div>
+                <div class="flex flex-col items-center">
+                  <span class="text-[10px] text-gray-400 uppercase tracking-wide">HR</span>
+                  @if (a.averageHeartrate) {
+                    <span class="text-sm font-bold text-gray-800 mt-0.5">{{ a.averageHeartrate | number:'1.0-0' }}</span>
+                    <span class="text-[10px] text-gray-400">bpm</span>
+                  } @else {
+                    <span class="text-sm font-bold text-gray-300 mt-0.5">—</span>
+                  }
+                </div>
+              </div>
 
-          <!-- Pagination -->
-          <mat-paginator
-            [length]="strava.totalActivities()"
-            [pageSize]="pageSize()"
-            [pageIndex]="currentPage()"
-            [pageSizeOptions]="[10, 20, 50, 100]"
-            (page)="onPageChange($event)"
-            showFirstLastButtons>
-          </mat-paginator>
-        </mat-card>
+            </div>
+          }
+        </div>
+
+        <!-- Pagination -->
+        <mat-paginator
+          [length]="strava.totalActivities()"
+          [pageSize]="pageSize()"
+          [pageIndex]="currentPage()"
+          [pageSizeOptions]="[10, 20, 50]"
+          (page)="onPageChange($event)"
+          showFirstLastButtons>
+        </mat-paginator>
+
       } @else {
-        <mat-card class="p-8 text-center">
-          <mat-icon class="text-gray-400 mb-3" style="font-size:48px;width:48px;height:48px;">
-            directions_run
-          </mat-icon>
-          <p class="text-gray-600 mb-4">No activities found.</p>
+        <div class="rounded-2xl bg-white border border-gray-100 p-10 text-center">
+          <mat-icon class="text-gray-300 mb-3" style="font-size:48px;width:48px;height:48px;">directions_run</mat-icon>
+          <p class="text-gray-500 text-sm mb-4">No activities found.</p>
           @if (strava.status().connected) {
-            <button mat-raised-button color="primary" (click)="syncActivities()">
-              <mat-icon>sync</mat-icon>
-              Sync Now
+            <button mat-raised-button (click)="syncActivities()" style="background:#e91e8c;color:white">
+              <mat-icon>sync</mat-icon> Sync Now
             </button>
           } @else {
-            <a mat-raised-button routerLink="/settings" style="background-color:#FC4C02;color:white;">
-              Connect Strava to import runs
+            <a mat-raised-button routerLink="/settings" style="background:#FC4C02;color:white">
+              Connect Strava
             </a>
           }
-        </mat-card>
+        </div>
       }
     </div>
 
     <!-- Share card modal -->
     @if (shareActivity()) {
-      <app-share-card
-        [activity]="shareActivity()!"
-        (close)="closeShareCard()"
-      />
+      <app-share-card [activity]="shareActivity()!" (close)="closeShareCard()" />
     }
   `,
 })
 export class StravaComponent implements OnInit {
   readonly strava = inject(StravaService);
-  readonly displayedColumns = ['date', 'name', 'distance', 'time', 'avgPace', 'heartrate', 'suffer', 'share'];
 
   private readonly snackBar = inject(MatSnackBar);
 
