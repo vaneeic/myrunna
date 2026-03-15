@@ -39,7 +39,7 @@ const W = 1080, H = 1080;
         </div>
 
         <!-- Controls -->
-        <div class="flex flex-col gap-3 md:w-64 w-full text-white">
+        <div class="flex flex-col gap-3 w-64 text-white">
 
           <!-- Background -->
           <section class="bg-white/10 rounded-2xl p-4">
