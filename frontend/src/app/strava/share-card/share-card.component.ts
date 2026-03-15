@@ -462,6 +462,21 @@ export class ShareCardComponent implements AfterViewInit {
     const glowColor = isLight ? 'rgba(26,10,46,.12)' : isMap ? 'rgba(255,255,255,.2)' : 'rgba(233,30,140,.22)';
     const mainColor = isLight ? '#1a0a2e' : isMap ? '#ffffff' : '#e91e8c';
 
+    // Clip route to inset area in padded map/photo mode
+    const needsClip = layout === 'padded' && (mode === 'map' || mode === 'custom');
+    if (needsClip) {
+      const statsTop = H - 150 - 62;
+      const ax = 44, ay = 108, aw = W - 88, ah = statsTop - 108 - 12, r = 20;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(ax+r,ay); ctx.lineTo(ax+aw-r,ay);
+      ctx.arcTo(ax+aw,ay,ax+aw,ay+r,r); ctx.lineTo(ax+aw,ay+ah-r);
+      ctx.arcTo(ax+aw,ay+ah,ax+aw-r,ay+ah,r); ctx.lineTo(ax+r,ay+ah);
+      ctx.arcTo(ax,ay+ah,ax,ay+ah-r,r); ctx.lineTo(ax,ay+r);
+      ctx.arcTo(ax,ay,ax+r,ay,r); ctx.closePath();
+      ctx.clip();
+    }
+
     // glow pass
     ctx.beginPath(); ctx.moveTo(...toC(coords[0]));
     for (let i=1;i<coords.length;i++) ctx.lineTo(...toC(coords[i]));
@@ -488,6 +503,8 @@ export class ShareCardComponent implements AfterViewInit {
     const [ex,ey]=toC(coords[coords.length-1]);
     ctx.beginPath(); ctx.arc(ex,ey,11,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
     ctx.beginPath(); ctx.arc(ex,ey,7,0,Math.PI*2); ctx.fillStyle='#e91e8c'; ctx.fill();
+
+    if (needsClip) ctx.restore();
   }
 
   // ── Stats panel ───────────────────────────────────────────────────────────────
