@@ -167,16 +167,22 @@ import { ShareCardComponent } from './share-card/share-card.component';
             showFirstLastButtons>
           </mat-paginator>
         </mat-card>
-      } @else if (strava.status().connected) {
+      } @else {
         <mat-card class="p-8 text-center">
           <mat-icon class="text-gray-400 mb-3" style="font-size:48px;width:48px;height:48px;">
             directions_run
           </mat-icon>
-          <p class="text-gray-600 mb-4">No activities synced yet.</p>
-          <button mat-raised-button color="primary" (click)="syncActivities()">
-            <mat-icon>sync</mat-icon>
-            Sync Now
-          </button>
+          <p class="text-gray-600 mb-4">No activities found.</p>
+          @if (strava.status().connected) {
+            <button mat-raised-button color="primary" (click)="syncActivities()">
+              <mat-icon>sync</mat-icon>
+              Sync Now
+            </button>
+          } @else {
+            <a mat-raised-button routerLink="/settings" style="background-color:#FC4C02;color:white;">
+              Connect Strava to import runs
+            </a>
+          }
         </mat-card>
       }
     </div>
@@ -205,14 +211,8 @@ export class StravaComponent implements OnInit {
   readonly sharingId = signal<string | null>(null);
 
   ngOnInit() {
-    this.strava.loadStatus().subscribe({
-      next: (s) => {
-        if (s.connected) {
-          this.loadPage();
-        }
-      },
-      error: () => {},
-    });
+    this.strava.loadStatus().subscribe({ error: () => {} });
+    this.loadPage();
   }
 
   loadPage() {
