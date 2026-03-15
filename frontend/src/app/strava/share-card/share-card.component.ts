@@ -19,9 +19,10 @@ const W = 1080, H = 1080;
   standalone: true,
   imports: [CommonModule, FormsModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule],
   template: `
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3"
+    <div class="fixed inset-0 z-50 overflow-y-auto bg-black/80"
          (click)="onOverlayClick($event)">
-      <div class="flex flex-col lg:flex-row gap-5 items-start max-h-[95vh] overflow-y-auto"
+      <div class="min-h-full flex items-center justify-center p-3">
+      <div class="flex flex-col lg:flex-row gap-5 items-start"
            (click)="$event.stopPropagation()">
 
         <!-- Canvas preview -->
@@ -111,6 +112,7 @@ const W = 1080, H = 1080;
               (click)="close.emit()">Close</button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   `,
