@@ -8,6 +8,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { StravaActivity } from '../../shared/services/strava.service';
+import { environment } from '../../../environments/environment';
 
 type BgMode  = 'dark' | 'light' | 'map' | 'custom';
 type Layout  = 'full' | 'padded';
@@ -19,9 +20,9 @@ const W = 1080, H = 1080;
   standalone: true,
   imports: [CommonModule, FormsModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule],
   template: `
-    <div class="fixed inset-0 z-50 overflow-y-auto bg-black/80"
+    <div class="fixed inset-0 z-[100] overflow-y-auto bg-black/80"
          (click)="onOverlayClick($event)">
-      <div class="min-h-full flex items-center justify-center p-3">
+      <div class="min-h-full flex items-center justify-center p-3 pb-24">
       <div class="flex flex-col lg:flex-row gap-5 items-start"
            (click)="$event.stopPropagation()">
 
@@ -358,7 +359,7 @@ export class ShareCardComponent implements AfterViewInit {
             img.onload  = () => { this.tileCache.set(key, img); tiles.push({img, cx, cy}); resolve(); };
             img.onerror = () => resolve();
             // Backend tile proxy — avoids CORS issues entirely
-            img.src = `/api/tiles/${zoom}/${tx}/${ty}`;
+            img.src = `${environment.apiUrl}/tiles/${zoom}/${tx}/${ty}`;
           }));
         }
       }
