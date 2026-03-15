@@ -353,11 +353,10 @@ export class ShareCardComponent implements AfterViewInit {
         } else {
           promises.push(new Promise<void>(resolve => {
             const img = new Image();
-            img.crossOrigin = 'anonymous';
             img.onload  = () => { this.tileCache.set(key, img); tiles.push({img, cx, cy}); resolve(); };
             img.onerror = () => resolve();
-            // CARTO dark-matter tiles — CORS-friendly, no API key needed for basic use
-            img.src = `https://a.basemaps.cartocdn.com/dark_matter/${zoom}/${tx}/${ty}.png`;
+            // Backend tile proxy — avoids CORS issues entirely
+            img.src = `/api/tiles/${zoom}/${tx}/${ty}`;
           }));
         }
       }
