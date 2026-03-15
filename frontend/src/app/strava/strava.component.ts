@@ -92,6 +92,17 @@ import { ShareCardComponent } from './share-card/share-card.component';
                 </button>
               </div>
 
+              <!-- Route preview -->
+              @if (a.summaryPolyline) {
+                <div class="rounded-xl overflow-hidden" style="height:72px;background:linear-gradient(135deg,#f8f0ff,#fff0f8)">
+                  <svg viewBox="0 0 200 80" class="w-full h-full" preserveAspectRatio="xMidYMid meet">
+                    <polyline [attr.points]="routePoints(a.summaryPolyline)"
+                      fill="none" stroke="#e91e8c" stroke-width="2.5"
+                      stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+                  </svg>
+                </div>
+              }
+
               <!-- Stats row -->
               <div class="grid grid-cols-4 gap-1 pt-2 border-t border-gray-50">
                 <div class="flex flex-col items-center">
@@ -238,6 +249,22 @@ export class StravaComponent implements OnInit {
     return `${m}:${String(s).padStart(2, '0')}`;
   }
 
+  routePoints(encoded: string): string {
+    const coords = decodePolyline(encoded);
+    if (coords.length < 2) return '';
+    let minLat=Infinity, maxLat=-Infinity, minLng=Infinity, maxLng=-Infinity;
+    for (const [la,ln] of coords) {
+      if(la<minLat)minLat=la; if(la>maxLat)maxLat=la;
+      if(ln<minLng)minLng=ln; if(ln>maxLng)maxLng=ln;
+    }
+    const lngSpan = maxLng-minLng||.001, latSpan = maxLat-minLat||.001;
+    const vw=200, vh=80, pad=8;
+    const scale = Math.min((vw-pad*2)/lngSpan, (vh-pad*2)/latSpan);
+    const rW=lngSpan*scale, rH=latSpan*scale;
+    const oX=pad+(vw-pad*2-rW)/2, oY=pad+(vh-pad*2-rH)/2;
+    return coords.map(([la,ln]) => `${oX+(ln-minLng)*scale},${oY+rH-(la-minLat)*scale}`).join(' ');
+  }
+
   formatPace(distanceMeters: number, movingTimeSeconds: number): string {
     if (!distanceMeters || !movingTimeSeconds) return '—';
 
@@ -250,4 +277,19 @@ export class StravaComponent implements OnInit {
 
     return `${minutes}:${String(seconds).padStart(2, '0')}/km`;
   }
+}
+
+function decodePolyline(enc: string): [number,number][] {
+  const out:[number,number][]=[];
+  let i=0,lat=0,lng=0;
+  while(i<enc.length){
+    let r=0,s=0,b:number;
+    do{b=enc.charCodeAt(i++)-63;r|=(b&0x1f)<<s;s+=5;}while(b>=0x20);
+    lat+=(r&1)?~(r>>1):r>>1;
+    r=0;s=0;
+    do{b=enc.charCodeAt(i++)-63;r|=(b&0x1f)<<s;s+=5;}while(b>=0x20);
+    lng+=(r&1)?~(r>>1):r>>1;
+    out.push([lat*1e-5,lng*1e-5]);
+  }
+  return out;
 }
