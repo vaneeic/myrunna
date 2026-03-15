@@ -8,7 +8,9 @@ import { MatTableModule } from '@angular/material/table';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { StravaService } from '../shared/services/strava.service';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { StravaService, StravaActivity } from '../shared/services/strava.service';
+import { ShareCardComponent } from './share-card/share-card.component';
 
 @Component({
   selector: 'app-strava',
@@ -25,6 +27,8 @@ import { StravaService } from '../shared/services/strava.service';
     MatSnackBarModule,
     MatProgressSpinnerModule,
     MatPaginatorModule,
+    MatTooltipModule,
+    ShareCardComponent,
   ],
   template: `
     <div class="p-6 max-w-5xl mx-auto">
@@ -130,12 +134,31 @@ import { StravaService } from '../shared/services/strava.service';
               </td>
             </ng-container>
 
+            <ng-container matColumnDef="share">
+              <th mat-header-cell *matHeaderCellDef></th>
+              <td mat-cell *matCellDef="let a">
+                <button
+                  mat-icon-button
+                  matTooltip="Generate share card"
+                  [disabled]="sharingId() === a.id"
+                  (click)="openShareCard(a)"
+                  style="color: #e91e8c;"
+                >
+                  @if (sharingId() === a.id) {
+                    <mat-spinner diameter="18"></mat-spinner>
+                  } @else {
+                    <mat-icon>ios_share</mat-icon>
+                  }
+                </button>
+              </td>
+            </ng-container>
+
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
             <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50"></tr>
           </table>
-          
+
           <!-- Pagination -->
-          <mat-paginator 
+          <mat-paginator
             [length]="strava.totalActivities()"
             [pageSize]="pageSize()"
             [pageIndex]="currentPage()"
@@ -157,17 +180,29 @@ import { StravaService } from '../shared/services/strava.service';
         </mat-card>
       }
     </div>
+
+    <!-- Share card modal -->
+    @if (shareActivity()) {
+      <app-share-card
+        [activity]="shareActivity()!"
+        (close)="closeShareCard()"
+      />
+    }
   `,
 })
 export class StravaComponent implements OnInit {
   readonly strava = inject(StravaService);
-  readonly displayedColumns = ['date', 'name', 'distance', 'time', 'avgPace', 'heartrate', 'suffer'];
+  readonly displayedColumns = ['date', 'name', 'distance', 'time', 'avgPace', 'heartrate', 'suffer', 'share'];
 
   private readonly snackBar = inject(MatSnackBar);
-  
+
   // Pagination state
   readonly currentPage = signal(0);
   readonly pageSize = signal(20);
+
+  // Share card state
+  readonly shareActivity = signal<StravaActivity | null>(null);
+  readonly sharingId = signal<string | null>(null);
 
   ngOnInit() {
     this.strava.loadStatus().subscribe({
@@ -216,6 +251,25 @@ export class StravaComponent implements OnInit {
     });
   }
 
+  openShareCard(activity: StravaActivity): void {
+    this.sharingId.set(activity.id);
+    // Fetch the full activity (includes summaryPolyline from RawJson)
+    this.strava.getActivity(activity.id).subscribe({
+      next: (full) => {
+        this.sharingId.set(null);
+        this.shareActivity.set(full);
+      },
+      error: () => {
+        this.sharingId.set(null);
+        this.snackBar.open('Could not load activity details.', 'Close', { duration: 4000 });
+      },
+    });
+  }
+
+  closeShareCard(): void {
+    this.shareActivity.set(null);
+  }
+
   formatTime(seconds: number): string {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -228,14 +282,14 @@ export class StravaComponent implements OnInit {
 
   formatPace(distanceMeters: number, movingTimeSeconds: number): string {
     if (!distanceMeters || !movingTimeSeconds) return '—';
-    
+
     const distanceKm = distanceMeters / 1000;
     const timeMinutes = movingTimeSeconds / 60;
     const paceMinPerKm = timeMinutes / distanceKm;
-    
+
     const minutes = Math.floor(paceMinPerKm);
     const seconds = Math.round((paceMinPerKm - minutes) * 60);
-    
+
     return `${minutes}:${String(seconds).padStart(2, '0')}/km`;
   }
 }

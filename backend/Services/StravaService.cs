@@ -345,8 +345,34 @@ public class StravaService(AppDbContext db, StravaTokenService tokenService, ICo
         existing.UpdatedAt = DateTime.UtcNow;
     }
 
-    public static StravaActivityDto MapActivityDto(StravaActivity a) => new(
-        a.Id, a.UserId, a.StravaId, a.Name, a.Type, a.Distance, a.MovingTime,
-        a.ElapsedTime, a.StartDate, a.AverageHeartrate, a.MaxHeartrate,
-        a.AverageCadence, a.SufferScore, a.CreatedAt, a.UpdatedAt);
+    public static StravaActivityDto MapActivityDto(StravaActivity a)
+    {
+        string? summaryPolyline = null;
+        if (!string.IsNullOrEmpty(a.RawJson))
+        {
+            try
+            {
+                var raw = JsonDocument.Parse(a.RawJson).RootElement;
+                if (raw.TryGetProperty("map", out var map) &&
+                    map.TryGetProperty("summary_polyline", out var poly) &&
+                    poly.ValueKind == JsonValueKind.String)
+                {
+                    summaryPolyline = poly.GetString();
+                    if (string.IsNullOrEmpty(summaryPolyline)) summaryPolyline = null;
+                }
+            }
+            catch { /* malformed JSON — leave polyline null */ }
+        }
+
+        return new(a.Id, a.UserId, a.StravaId, a.Name, a.Type, a.Distance, a.MovingTime,
+            a.ElapsedTime, a.StartDate, a.AverageHeartrate, a.MaxHeartrate,
+            a.AverageCadence, a.SufferScore, a.CreatedAt, a.UpdatedAt, summaryPolyline);
+    }
+
+    public async Task<StravaActivityDto?> GetActivityAsync(Guid userId, Guid activityId)
+    {
+        var activity = await db.StravaActivities
+            .FirstOrDefaultAsync(a => a.Id == activityId && a.UserId == userId);
+        return activity is null ? null : MapActivityDto(activity);
+    }
 }

@@ -35,7 +35,7 @@ public record StravaSyncResult(int Imported, int Updated);
 public record StravaActivityDto(Guid Id, Guid UserId, string StravaId, string Name, string Type,
     double Distance, int MovingTime, int ElapsedTime, DateTime StartDate,
     double? AverageHeartrate, double? MaxHeartrate, double? AverageCadence, int? SufferScore,
-    DateTime CreatedAt, DateTime UpdatedAt);
+    DateTime CreatedAt, DateTime UpdatedAt, string? SummaryPolyline);
 
 public record PaginatedActivitiesResponse(IEnumerable<StravaActivityDto> Activities,
     int Total, int Page, int PerPage, int TotalPages);

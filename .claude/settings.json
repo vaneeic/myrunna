@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r ^$.*-palette: /Users/vaneeic/myrunna/frontend/node_modules/@angular/material/_index.scss)",
+      "Bash(grep -r ^$.*palette /Users/vaneeic/myrunna/frontend/node_modules/@angular/material/core/theming/_palettes.scss)",
+      "Bash(node_modules/.bin/ng build:*)"
+    ]
+  }
+}

@@ -1,4 +1,5 @@
 import { Injectable, signal } from '@angular/core';
+import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 import { tap } from 'rxjs/operators';
 
@@ -29,6 +30,7 @@ export interface StravaActivity {
   maxHeartrate?: number;
   averageCadence?: number;
   sufferScore?: number;
+  summaryPolyline?: string;
 }
 
 export interface ActivitiesResponse {
@@ -95,6 +97,10 @@ export class StravaService {
         error: () => this._syncing.set(false),
       }),
     );
+  }
+
+  getActivity(id: string): Observable<StravaActivity> {
+    return this.api.get<StravaActivity>(`/strava/activities/${id}`);
   }
 
   recalculatePaces() {

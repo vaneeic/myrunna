@@ -95,6 +95,15 @@ public class StravaController(StravaService stravaService, IConfiguration config
     public async Task<IActionResult> GetActivities([FromQuery] int page = 1, [FromQuery] int perPage = 20)
         => Ok(await stravaService.GetActivitiesAsync(UserId, page, perPage));
 
+    [Authorize]
+    [HttpGet("activities/{id:guid}")]
+    public async Task<IActionResult> GetActivity(Guid id)
+    {
+        var activity = await stravaService.GetActivityAsync(UserId, id);
+        if (activity is null) return NotFound(new { message = "Activity not found." });
+        return Ok(activity);
+    }
+
     // ── Webhook ──────────────────────────────────────────────────────────────
 
     [HttpGet("webhook")]
