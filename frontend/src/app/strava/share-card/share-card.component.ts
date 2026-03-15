@@ -57,10 +57,10 @@ const W = 1080, H = 1080;
             </div>
             <input #fileInput type="file" accept="image/*" class="hidden" (change)="onFileChange($event)" />
 
-            <!-- Photo layout sub-option — only shown when photo is selected -->
-            @if (bgMode() === 'custom') {
+            <!-- Layout sub-option — shown for Map and Photo -->
+            @if (bgMode() === 'custom' || bgMode() === 'map') {
               <div class="mt-3 pt-3 border-t border-white/10">
-                <p class="text-white/50 text-xs mb-2">Photo layout</p>
+                <p class="text-white/50 text-xs mb-2">Layout</p>
                 <div class="flex gap-1.5">
                   <button class="flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all"
                     [style.background]="layout()==='full' ? 'rgba(233,30,140,.18)' : 'transparent'"
@@ -132,6 +132,7 @@ export class ShareCardComponent implements AfterViewInit {
 
   private customImg  = signal<HTMLImageElement | null>(null);
   private tileCache  = new Map<string, HTMLImageElement>();
+  private mapProj: { zoom: number; txMin: number; tyMin: number; tileSize: number; offsetX: number; offsetY: number } | null = null;
 
   stats = signal<Record<string, boolean>>({ distance:true, pace:true, time:true, hr:true });
 
@@ -204,7 +205,7 @@ export class ShareCardComponent implements AfterViewInit {
 
     // ── Background ────────────────────────────────────────────────────────────
     if (mode === 'map' && coords.length > 1) {
-      const drawn = await this.drawMapBg(ctx, coords);
+      const drawn = await this.drawMapBg(ctx, coords, layout);
       if (!drawn) this.drawDarkBg(ctx); // fallback
     } else if (mode === 'light') {
       this.drawLightBg(ctx);
@@ -320,65 +321,103 @@ export class ShareCardComponent implements AfterViewInit {
     }
   }
 
-  private async drawMapBg(ctx: CanvasRenderingContext2D, coords: [number,number][]): Promise<boolean> {
+  private async drawMapBg(ctx: CanvasRenderingContext2D, coords: [number,number][], layout: Layout): Promise<boolean> {
     let minLat=Infinity, maxLat=-Infinity, minLng=Infinity, maxLng=-Infinity;
     for (const [la,ln] of coords) {
       if(la<minLat)minLat=la; if(la>maxLat)maxLat=la;
       if(ln<minLng)minLng=ln; if(ln>maxLng)maxLng=ln;
     }
 
+    // Determine drawing area (full canvas vs padded inset)
+    const isPadded = layout === 'padded';
+    const statsTop = H - 150 - 62;
+    let areaX: number, areaY: number, areaW: number, areaH: number;
+    if (isPadded) {
+      this.drawDarkBg(ctx);
+      areaX = 44; areaY = 108; areaW = W - 88; areaH = statsTop - 108 - 12;
+    } else {
+      areaX = 0; areaY = 0; areaW = W; areaH = H;
+    }
+
     const zoom = calcZoom(minLat, maxLat, minLng, maxLng);
     const tl   = latLngToTileF(maxLat, minLng, zoom);
     const br   = latLngToTileF(minLat, maxLng, zoom);
 
-    // add padding in tile-space
     const pad  = 0.6;
     const txMin = Math.floor(tl.x - pad), txMax = Math.ceil(br.x + pad);
     const tyMin = Math.floor(tl.y - pad), tyMax = Math.ceil(br.y + pad);
 
-    // pixel-per-tile scale so route fills canvas
     const tileSpanX = txMax - txMin, tileSpanY = tyMax - tyMin;
-    const tileSize  = Math.min(W / tileSpanX, H / tileSpanY);
+    const tileSize  = Math.min(areaW / tileSpanX, areaH / tileSpanY);
+    const offsetX   = areaX + (areaW - tileSpanX * tileSize) / 2;
+    const offsetY   = areaY + (areaH - tileSpanY * tileSize) / 2;
+
+    // Store projection so drawRoute can reuse it
+    this.mapProj = { zoom, txMin, tyMin, tileSize, offsetX, offsetY };
 
     this.mapLoading.set(true);
 
     const promises: Promise<void>[] = [];
-    const tiles: { img:HTMLImageElement; cx:number; cy:number }[] = [];
+    const tiles: { img: HTMLImageElement; tx: number; ty: number }[] = [];
 
     for (let tx=txMin; tx<txMax; tx++) {
       for (let ty=tyMin; ty<tyMax; ty++) {
         const key = `${zoom}/${tx}/${ty}`;
-        const cx  = (tx - txMin) * tileSize + (W - tileSpanX * tileSize) / 2;
-        const cy  = (ty - tyMin) * tileSize + (H - tileSpanY * tileSize) / 2;
-
+        const capTx = tx, capTy = ty;
         if (this.tileCache.has(key)) {
-          tiles.push({ img: this.tileCache.get(key)!, cx, cy });
+          tiles.push({ img: this.tileCache.get(key)!, tx, ty });
         } else {
           promises.push(new Promise<void>(resolve => {
             const img = new Image();
-            img.onload  = () => { this.tileCache.set(key, img); tiles.push({img, cx, cy}); resolve(); };
+            img.onload  = () => { this.tileCache.set(key, img); tiles.push({ img, tx: capTx, ty: capTy }); resolve(); };
             img.onerror = () => resolve();
-            // Backend tile proxy — avoids CORS issues entirely
-            img.src = `${environment.apiUrl}/tiles/${zoom}/${tx}/${ty}`;
+            img.src = `${environment.apiUrl}/tiles/${zoom}/${capTx}/${capTy}`;
           }));
         }
       }
     }
 
-    try {
-      await Promise.all(promises);
-    } catch { this.mapLoading.set(false); return false; }
-
+    try { await Promise.all(promises); }
+    catch { this.mapLoading.set(false); return false; }
     this.mapLoading.set(false);
 
     if (tiles.length === 0) return false;
 
-    for (const t of tiles) ctx.drawImage(t.img, t.cx, t.cy, tileSize, tileSize);
+    if (isPadded) {
+      const r = 20;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(areaX+r,areaY); ctx.lineTo(areaX+areaW-r,areaY);
+      ctx.arcTo(areaX+areaW,areaY,areaX+areaW,areaY+r,r); ctx.lineTo(areaX+areaW,areaY+areaH-r);
+      ctx.arcTo(areaX+areaW,areaY+areaH,areaX+areaW-r,areaY+areaH,r); ctx.lineTo(areaX+r,areaY+areaH);
+      ctx.arcTo(areaX,areaY+areaH,areaX,areaY+areaH-r,r); ctx.lineTo(areaX,areaY+r);
+      ctx.arcTo(areaX,areaY,areaX+r,areaY,r); ctx.closePath();
+      ctx.clip();
+    }
 
-    // slight darkening overlay so route + text pop
-    const ov = ctx.createRadialGradient(W/2,H/2,W*.1,W/2,H/2,W*.72);
+    for (const t of tiles) {
+      ctx.drawImage(t.img, offsetX + (t.tx - txMin) * tileSize, offsetY + (t.ty - tyMin) * tileSize, tileSize, tileSize);
+    }
+
+    // Darkening overlay
+    const ov = ctx.createRadialGradient(areaX+areaW/2,areaY+areaH/2,Math.min(areaW,areaH)*.1,areaX+areaW/2,areaY+areaH/2,Math.min(areaW,areaH)*.72);
     ov.addColorStop(0,'rgba(0,0,0,.05)'); ov.addColorStop(1,'rgba(0,0,0,.45)');
-    ctx.fillStyle=ov; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle=ov; ctx.fillRect(areaX,areaY,areaW,areaH);
+
+    if (isPadded) {
+      ctx.restore();
+      // Pink border
+      ctx.save();
+      const r = 20;
+      ctx.beginPath();
+      ctx.moveTo(areaX+r,areaY); ctx.lineTo(areaX+areaW-r,areaY);
+      ctx.arcTo(areaX+areaW,areaY,areaX+areaW,areaY+r,r); ctx.lineTo(areaX+areaW,areaY+areaH-r);
+      ctx.arcTo(areaX+areaW,areaY+areaH,areaX+areaW-r,areaY+areaH,r); ctx.lineTo(areaX+r,areaY+areaH);
+      ctx.arcTo(areaX,areaY+areaH,areaX,areaY+areaH-r,r); ctx.lineTo(areaX,areaY+r);
+      ctx.arcTo(areaX,areaY,areaX+r,areaY,r); ctx.closePath();
+      ctx.strokeStyle='rgba(233,30,140,.4)'; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.restore();
+    }
 
     return true;
   }
@@ -386,42 +425,42 @@ export class ShareCardComponent implements AfterViewInit {
   // ── Route drawing ─────────────────────────────────────────────────────────────
 
   private drawRoute(ctx: CanvasRenderingContext2D, coords: [number,number][], mode: BgMode, layout: Layout) {
-    let minLat=Infinity,maxLat=-Infinity,minLng=Infinity,maxLng=-Infinity;
-    for (const [la,ln] of coords) {
-      if(la<minLat)minLat=la; if(la>maxLat)maxLat=la;
-      if(ln<minLng)minLng=ln; if(ln>maxLng)maxLng=ln;
-    }
-    const latSpan = maxLat-minLat||.001, lngSpan = maxLng-minLng||.001;
+    let toC: (c: [number,number]) => [number,number];
 
-    const statsH  = 158;
-    const headerH = 100;
-
-    // In padded-photo mode, route is constrained to the photo inset
-    const isPhotoInset = mode === 'custom' && layout === 'padded';
-    let boxX: number, boxY: number, boxW: number, boxH: number;
-    if (isPhotoInset) {
-      const statsTop = H - 150 - 62;
-      boxX = 60; boxY = 120; boxW = W - 120; boxH = statsTop - 120 - 12;
+    if (mode === 'map' && this.mapProj) {
+      // Use the same Mercator tile projection that drawMapBg used
+      const { zoom, txMin, tyMin, tileSize, offsetX, offsetY } = this.mapProj;
+      toC = ([la,ln]) => {
+        const tf = latLngToTileF(la, ln, zoom);
+        return [offsetX + (tf.x - txMin) * tileSize, offsetY + (tf.y - tyMin) * tileSize];
+      };
     } else {
-      const pad = 44;
-      boxX = pad; boxY = headerH;
-      boxW = W - pad*2; boxH = H - headerH - statsH - 8;
+      // Simple linear projection for dark/light/photo modes
+      let minLat=Infinity,maxLat=-Infinity,minLng=Infinity,maxLng=-Infinity;
+      for (const [la,ln] of coords) {
+        if(la<minLat)minLat=la; if(la>maxLat)maxLat=la;
+        if(ln<minLng)minLng=ln; if(ln>maxLng)maxLng=ln;
+      }
+      const latSpan = maxLat-minLat||.001, lngSpan = maxLng-minLng||.001;
+      const statsH = 158, headerH = 100;
+      const isPadded = mode === 'custom' && layout === 'padded';
+      let boxX: number, boxY: number, boxW: number, boxH: number;
+      if (isPadded) {
+        const statsTop = H - 150 - 62;
+        boxX = 60; boxY = 120; boxW = W - 120; boxH = statsTop - 120 - 12;
+      } else {
+        const p = 44; boxX = p; boxY = headerH; boxW = W - p*2; boxH = H - headerH - statsH - 8;
+      }
+      const scale = Math.min(boxW/lngSpan, boxH/latSpan) * .88;
+      const rW = lngSpan*scale, rH = latSpan*scale;
+      const oX = boxX + (boxW-rW)/2, oY = boxY + (boxH-rH)/2;
+      toC = ([la,ln]) => [oX + (ln-minLng)*scale, oY + rH - (la-minLat)*scale];
     }
 
-    const scale = Math.min(boxW/lngSpan, boxH/latSpan) * .88;
-    const rW = lngSpan*scale, rH = latSpan*scale;
-    const oX = boxX + (boxW-rW)/2, oY = boxY + (boxH-rH)/2;
-
-    const toC = ([la,ln]: [number,number]): [number,number] => [
-      oX + (ln-minLng)*scale,
-      oY + rH - (la-minLat)*scale,
-    ];
-
-    const isMap    = mode === 'map';
-    const isLight  = mode === 'light';
-    const lineColor = isLight ? '#1a0a2e' : '#e91e8c';
+    const isMap   = mode === 'map';
+    const isLight = mode === 'light';
     const glowColor = isLight ? 'rgba(26,10,46,.12)' : isMap ? 'rgba(255,255,255,.2)' : 'rgba(233,30,140,.22)';
-    const mainColor = isMap ? '#ffffff' : lineColor;
+    const mainColor = isLight ? '#1a0a2e' : isMap ? '#ffffff' : '#e91e8c';
 
     // glow pass
     ctx.beginPath(); ctx.moveTo(...toC(coords[0]));
@@ -433,11 +472,11 @@ export class ShareCardComponent implements AfterViewInit {
     for (let i=1;i<coords.length;i++) ctx.lineTo(...toC(coords[i]));
     ctx.strokeStyle=mainColor; ctx.lineWidth=isLight?5:4; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke();
 
-    // on map mode: pink accent over white line
+    // pink accent over white line on map
     if (isMap) {
       ctx.beginPath(); ctx.moveTo(...toC(coords[0]));
       for (let i=1;i<coords.length;i++) ctx.lineTo(...toC(coords[i]));
-      ctx.strokeStyle='rgba(233,30,140,.55)'; ctx.lineWidth=2; ctx.stroke();
+      ctx.strokeStyle='rgba(233,30,140,.7)'; ctx.lineWidth=2.5; ctx.stroke();
     }
 
     // start dot
