@@ -98,7 +98,8 @@ const W = 1080, H = 1080;
           <section class="bg-white/10 rounded-2xl p-4">
             <p class="text-white/60 text-xs font-semibold uppercase tracking-wide mb-2">Your tag</p>
             <input type="text"
-              class="w-full bg-white/10 text-white text-sm rounded-xl px-3 py-2 border border-white/20 focus:outline-none focus:border-pink-400 transition-colors"
+              class="bg-white/10 text-white text-sm rounded-xl px-3 py-2 border border-white/20 focus:outline-none focus:border-pink-400 transition-colors"
+              style="width:200px"
               placeholder="@icvanee"
               [ngModel]="tag()" (ngModelChange)="tag.set($event); redraw()" />
           </section>
