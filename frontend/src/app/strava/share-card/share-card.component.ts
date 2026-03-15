@@ -54,23 +54,25 @@ const W = 1080, H = 1080;
               }
             </div>
             <input #fileInput type="file" accept="image/*" class="hidden" (change)="onFileChange($event)" />
-          </section>
 
-          <!-- Layout -->
-          <section class="bg-white/10 rounded-2xl p-4">
-            <p class="text-white/60 text-xs font-semibold uppercase tracking-wide mb-2.5">Route size</p>
-            <div class="flex gap-1.5">
-              <button class="flex-1 py-2 rounded-xl text-xs font-semibold border transition-all"
-                [style.background]="layout()==='full' ? 'rgba(233,30,140,.18)' : 'transparent'"
-                [style.color]="layout()==='full' ? '#e91e8c' : 'rgba(255,255,255,.45)'"
-                [style.border-color]="layout()==='full' ? '#e91e8c' : 'rgba(255,255,255,.12)'"
-                (click)="setLayout('full')">⛶ Full bleed</button>
-              <button class="flex-1 py-2 rounded-xl text-xs font-semibold border transition-all"
-                [style.background]="layout()==='padded' ? 'rgba(233,30,140,.18)' : 'transparent'"
-                [style.color]="layout()==='padded' ? '#e91e8c' : 'rgba(255,255,255,.45)'"
-                [style.border-color]="layout()==='padded' ? '#e91e8c' : 'rgba(255,255,255,.12)'"
-                (click)="setLayout('padded')">▣ Padded</button>
-            </div>
+            <!-- Photo layout sub-option — only shown when photo is selected -->
+            @if (bgMode() === 'custom') {
+              <div class="mt-3 pt-3 border-t border-white/10">
+                <p class="text-white/50 text-xs mb-2">Photo layout</p>
+                <div class="flex gap-1.5">
+                  <button class="flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+                    [style.background]="layout()==='full' ? 'rgba(233,30,140,.18)' : 'transparent'"
+                    [style.color]="layout()==='full' ? '#e91e8c' : 'rgba(255,255,255,.4)'"
+                    [style.border-color]="layout()==='full' ? '#e91e8c' : 'rgba(255,255,255,.1)'"
+                    (click)="setLayout('full')">⛶ Full</button>
+                  <button class="flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+                    [style.background]="layout()==='padded' ? 'rgba(233,30,140,.18)' : 'transparent'"
+                    [style.color]="layout()==='padded' ? '#e91e8c' : 'rgba(255,255,255,.4)'"
+                    [style.border-color]="layout()==='padded' ? '#e91e8c' : 'rgba(255,255,255,.1)'"
+                    (click)="setLayout('padded')">▣ Padded</button>
+                </div>
+              </div>
+            }
           </section>
 
           <!-- Stats -->
@@ -238,10 +240,10 @@ export class ShareCardComponent implements AfterViewInit {
     ctx.fillStyle = mutedColor; ctx.textAlign = 'right';
     ctx.fillText(dateStr, W - 52, 80);
 
-    // ── Tag ───────────────────────────────────────────────────────────────────
-    ctx.font = 'bold 28px system-ui,sans-serif';
+    // ── Tag — sits below stats panel ─────────────────────────────────────────
+    ctx.font = 'bold 26px system-ui,sans-serif';
     ctx.fillStyle = '#e91e8c'; ctx.textAlign = 'right';
-    ctx.fillText(this.tag(), W - 52, H - 32);
+    ctx.fillText(this.tag(), W - 52, H - 14);
   }
 
   // ── Background helpers ────────────────────────────────────────────────────────
@@ -269,11 +271,48 @@ export class ShareCardComponent implements AfterViewInit {
   }
 
   private drawCustomBg(ctx: CanvasRenderingContext2D, img: HTMLImageElement) {
-    const s = Math.max(W/img.width, H/img.height);
-    ctx.drawImage(img,(W-img.width*s)/2,(H-img.height*s)/2,img.width*s,img.height*s);
-    const ov = ctx.createLinearGradient(0,0,0,H);
-    ov.addColorStop(0,'rgba(0,0,0,.45)'); ov.addColorStop(.5,'rgba(0,0,0,.2)'); ov.addColorStop(1,'rgba(0,0,0,.65)');
-    ctx.fillStyle=ov; ctx.fillRect(0,0,W,H);
+    if (this.layout() === 'padded') {
+      // Dark background with photo in a framed inset
+      this.drawDarkBg(ctx);
+      const insetX = 44, insetY = 108, insetW = W - 88, insetH = H - 280, r = 20;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(insetX+r, insetY);
+      ctx.lineTo(insetX+insetW-r, insetY);
+      ctx.arcTo(insetX+insetW, insetY, insetX+insetW, insetY+r, r);
+      ctx.lineTo(insetX+insetW, insetY+insetH-r);
+      ctx.arcTo(insetX+insetW, insetY+insetH, insetX+insetW-r, insetY+insetH, r);
+      ctx.lineTo(insetX+r, insetY+insetH);
+      ctx.arcTo(insetX, insetY+insetH, insetX, insetY+insetH-r, r);
+      ctx.lineTo(insetX, insetY+r);
+      ctx.arcTo(insetX, insetY, insetX+r, insetY, r);
+      ctx.closePath();
+      ctx.clip();
+      const s = Math.max(insetW/img.width, insetH/img.height);
+      ctx.drawImage(img, insetX+(insetW-img.width*s)/2, insetY+(insetH-img.height*s)/2, img.width*s, img.height*s);
+      // subtle darkening inside the inset
+      const ov = ctx.createLinearGradient(0,insetY,0,insetY+insetH);
+      ov.addColorStop(0,'rgba(0,0,0,.35)'); ov.addColorStop(.4,'rgba(0,0,0,.1)'); ov.addColorStop(1,'rgba(0,0,0,.5)');
+      ctx.fillStyle=ov; ctx.fillRect(insetX,insetY,insetW,insetH);
+      ctx.restore();
+      // thin pink border around inset
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(insetX+r,insetY); ctx.lineTo(insetX+insetW-r,insetY);
+      ctx.arcTo(insetX+insetW,insetY,insetX+insetW,insetY+r,r); ctx.lineTo(insetX+insetW,insetY+insetH-r);
+      ctx.arcTo(insetX+insetW,insetY+insetH,insetX+insetW-r,insetY+insetH,r); ctx.lineTo(insetX+r,insetY+insetH);
+      ctx.arcTo(insetX,insetY+insetH,insetX,insetY+insetH-r,r); ctx.lineTo(insetX,insetY+r);
+      ctx.arcTo(insetX,insetY,insetX+r,insetY,r); ctx.closePath();
+      ctx.strokeStyle='rgba(233,30,140,.4)'; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.restore();
+    } else {
+      // Full bleed — photo fills the entire card
+      const s = Math.max(W/img.width, H/img.height);
+      ctx.drawImage(img,(W-img.width*s)/2,(H-img.height*s)/2,img.width*s,img.height*s);
+      const ov = ctx.createLinearGradient(0,0,0,H);
+      ov.addColorStop(0,'rgba(0,0,0,.45)'); ov.addColorStop(.5,'rgba(0,0,0,.2)'); ov.addColorStop(1,'rgba(0,0,0,.65)');
+      ctx.fillStyle=ov; ctx.fillRect(0,0,W,H);
+    }
   }
 
   private async drawMapBg(ctx: CanvasRenderingContext2D, coords: [number,number][]): Promise<boolean> {
@@ -353,15 +392,15 @@ export class ShareCardComponent implements AfterViewInit {
     const statsH  = 158;
     const headerH = 100;
 
+    // In padded-photo mode, route is constrained to the photo inset
+    const isPhotoInset = mode === 'custom' && layout === 'padded';
     let boxX: number, boxY: number, boxW: number, boxH: number;
-    if (layout === 'full') {
+    if (isPhotoInset) {
+      boxX = 60; boxY = 120; boxW = W - 120; boxH = H - 280 - 20;
+    } else {
       const pad = 44;
       boxX = pad; boxY = headerH;
       boxW = W - pad*2; boxH = H - headerH - statsH - 8;
-    } else {
-      const pad = 70;
-      boxX = pad; boxY = headerH + 10;
-      boxW = W - pad*2; boxH = H - headerH - statsH - 60;
     }
 
     const scale = Math.min(boxW/lngSpan, boxH/latSpan) * .88;
@@ -410,7 +449,7 @@ export class ShareCardComponent implements AfterViewInit {
   // ── Stats panel ───────────────────────────────────────────────────────────────
 
   private drawStats(ctx: CanvasRenderingContext2D, items: {label:string;value:string}[], mode: BgMode) {
-    const pH=150, pTop=H-pH-48, pX=44, pW=W-88, r=18;
+    const pH=150, pTop=H-pH-62, pX=44, pW=W-88, r=18;
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(pX+r,pTop); ctx.lineTo(pX+pW-r,pTop);
