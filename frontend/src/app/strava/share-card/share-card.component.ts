@@ -274,7 +274,9 @@ export class ShareCardComponent implements AfterViewInit {
     if (this.layout() === 'padded') {
       // Dark background with photo in a framed inset
       this.drawDarkBg(ctx);
-      const insetX = 44, insetY = 108, insetW = W - 88, insetH = H - 280, r = 20;
+      // inset must end 12px above the stats panel (pTop = H - 150 - 62 = 868)
+      const statsTop = H - 150 - 62;
+      const insetX = 44, insetY = 108, insetW = W - 88, insetH = statsTop - insetY - 12, r = 20;
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(insetX+r, insetY);
@@ -396,7 +398,8 @@ export class ShareCardComponent implements AfterViewInit {
     const isPhotoInset = mode === 'custom' && layout === 'padded';
     let boxX: number, boxY: number, boxW: number, boxH: number;
     if (isPhotoInset) {
-      boxX = 60; boxY = 120; boxW = W - 120; boxH = H - 280 - 20;
+      const statsTop = H - 150 - 62;
+      boxX = 60; boxY = 120; boxW = W - 120; boxH = statsTop - 120 - 12;
     } else {
       const pad = 44;
       boxX = pad; boxY = headerH;
