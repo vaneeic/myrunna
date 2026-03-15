@@ -1,126 +1,113 @@
 import {
-  Component,
-  Input,
-  AfterViewInit,
-  ViewChild,
-  ElementRef,
-  Output,
-  EventEmitter,
-  signal,
+  Component, Input, AfterViewInit, ViewChild, ElementRef,
+  Output, EventEmitter, signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { StravaActivity } from '../../shared/services/strava.service';
 
-type BgMode = 'dark' | 'light' | 'custom';
+type BgMode  = 'dark' | 'light' | 'map' | 'custom';
+type Layout  = 'full' | 'padded';
+
+const W = 1080, H = 1080;
 
 @Component({
   selector: 'app-share-card',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatButtonModule, MatIconModule, MatTooltipModule],
+  imports: [CommonModule, FormsModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule],
   template: `
-    <!-- Modal overlay -->
-    <div
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-      (click)="onOverlayClick($event)"
-    >
-      <div class="flex flex-col lg:flex-row gap-5 items-start max-h-[95vh] overflow-y-auto" (click)="$event.stopPropagation()">
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3"
+         (click)="onOverlayClick($event)">
+      <div class="flex flex-col lg:flex-row gap-5 items-start max-h-[95vh] overflow-y-auto"
+           (click)="$event.stopPropagation()">
 
         <!-- Canvas preview -->
-        <div class="flex-shrink-0">
-          <canvas
-            #card
-            width="1080"
-            height="1080"
-            style="width: min(480px, 90vw); height: min(480px, 90vw); border-radius: 14px; display: block; box-shadow: 0 8px 40px rgba(0,0,0,0.6);"
-          ></canvas>
+        <div class="flex-shrink-0 relative">
+          <canvas #card width="1080" height="1080"
+            style="width:min(460px,88vw);height:min(460px,88vw);border-radius:14px;display:block;box-shadow:0 8px 40px rgba(0,0,0,.6)">
+          </canvas>
+          @if (mapLoading()) {
+            <div class="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/50">
+              <mat-spinner diameter="36" style="--mdc-circular-progress-active-indicator-color:#e91e8c"></mat-spinner>
+            </div>
+          }
         </div>
 
-        <!-- Controls panel -->
-        <div class="flex flex-col gap-4 lg:w-64 w-full">
+        <!-- Controls -->
+        <div class="flex flex-col gap-3 lg:w-64 w-full text-white">
 
           <!-- Background -->
-          <div class="bg-white/10 rounded-2xl p-4">
-            <p class="text-white/70 text-xs font-semibold uppercase tracking-wide mb-3">Background</p>
-            <div class="flex gap-2">
-              <button
-                class="flex-1 py-2 rounded-xl text-xs font-semibold transition-all border"
-                [style.background]="bgMode() === 'dark' ? 'linear-gradient(135deg,#0d0a1a,#1a0a2e)' : 'transparent'"
-                [style.color]="bgMode() === 'dark' ? '#fff' : 'rgba(255,255,255,0.5)'"
-                [style.border-color]="bgMode() === 'dark' ? '#e91e8c' : 'rgba(255,255,255,0.15)'"
-                (click)="setBg('dark')"
-              >🌙 Dark</button>
-              <button
-                class="flex-1 py-2 rounded-xl text-xs font-semibold transition-all border"
-                [style.background]="bgMode() === 'light' ? '#f8f0ff' : 'transparent'"
-                [style.color]="bgMode() === 'light' ? '#1a0a2e' : 'rgba(255,255,255,0.5)'"
-                [style.border-color]="bgMode() === 'light' ? '#e91e8c' : 'rgba(255,255,255,0.15)'"
-                (click)="setBg('light')"
-              >☀️ Light</button>
-              <button
-                class="flex-1 py-2 rounded-xl text-xs font-semibold transition-all border"
-                [style.background]="bgMode() === 'custom' ? 'rgba(233,30,140,0.15)' : 'transparent'"
-                [style.color]="bgMode() === 'custom' ? '#e91e8c' : 'rgba(255,255,255,0.5)'"
-                [style.border-color]="bgMode() === 'custom' ? '#e91e8c' : 'rgba(255,255,255,0.15)'"
-                (click)="pickFile()"
-              >🖼 Photo</button>
-            </div>
-            <input #fileInput type="file" accept="image/*" class="hidden" (change)="onFileChange($event)" />
-          </div>
-
-          <!-- Stats toggles -->
-          <div class="bg-white/10 rounded-2xl p-4">
-            <p class="text-white/70 text-xs font-semibold uppercase tracking-wide mb-3">Stats to show</p>
-            <div class="grid grid-cols-2 gap-2">
-              @for (stat of statDefs; track stat.key) {
-                <button
-                  class="py-2 px-3 rounded-xl text-xs font-semibold transition-all border text-left"
-                  [style.background]="statEnabled(stat.key) ? 'rgba(233,30,140,0.15)' : 'transparent'"
-                  [style.color]="statEnabled(stat.key) ? '#e91e8c' : 'rgba(255,255,255,0.4)'"
-                  [style.border-color]="statEnabled(stat.key) ? '#e91e8c' : 'rgba(255,255,255,0.12)'"
-                  (click)="toggleStat(stat.key)"
-                >
-                  {{ stat.label }}
-                  @if (statEnabled(stat.key)) { <span class="float-right">✓</span> }
+          <section class="bg-white/10 rounded-2xl p-4">
+            <p class="text-white/60 text-xs font-semibold uppercase tracking-wide mb-2.5">Background</p>
+            <div class="grid grid-cols-2 gap-1.5">
+              @for (bg of bgDefs; track bg.mode) {
+                <button class="py-2 rounded-xl text-xs font-semibold border transition-all"
+                  [style.background]="bgMode()===bg.mode ? 'rgba(233,30,140,.18)' : 'transparent'"
+                  [style.color]="bgMode()===bg.mode ? '#e91e8c' : 'rgba(255,255,255,.45)'"
+                  [style.border-color]="bgMode()===bg.mode ? '#e91e8c' : 'rgba(255,255,255,.12)'"
+                  (click)="bg.mode === 'custom' ? pickFile() : setBg(bg.mode)">
+                  {{ bg.label }}
                 </button>
               }
             </div>
-          </div>
+            <input #fileInput type="file" accept="image/*" class="hidden" (change)="onFileChange($event)" />
+          </section>
 
-          <!-- Branding -->
-          <div class="bg-white/10 rounded-2xl p-4">
-            <p class="text-white/70 text-xs font-semibold uppercase tracking-wide mb-2">Your tag</p>
-            <input
-              type="text"
+          <!-- Layout -->
+          <section class="bg-white/10 rounded-2xl p-4">
+            <p class="text-white/60 text-xs font-semibold uppercase tracking-wide mb-2.5">Route size</p>
+            <div class="flex gap-1.5">
+              <button class="flex-1 py-2 rounded-xl text-xs font-semibold border transition-all"
+                [style.background]="layout()==='full' ? 'rgba(233,30,140,.18)' : 'transparent'"
+                [style.color]="layout()==='full' ? '#e91e8c' : 'rgba(255,255,255,.45)'"
+                [style.border-color]="layout()==='full' ? '#e91e8c' : 'rgba(255,255,255,.12)'"
+                (click)="setLayout('full')">⛶ Full bleed</button>
+              <button class="flex-1 py-2 rounded-xl text-xs font-semibold border transition-all"
+                [style.background]="layout()==='padded' ? 'rgba(233,30,140,.18)' : 'transparent'"
+                [style.color]="layout()==='padded' ? '#e91e8c' : 'rgba(255,255,255,.45)'"
+                [style.border-color]="layout()==='padded' ? '#e91e8c' : 'rgba(255,255,255,.12)'"
+                (click)="setLayout('padded')">▣ Padded</button>
+            </div>
+          </section>
+
+          <!-- Stats -->
+          <section class="bg-white/10 rounded-2xl p-4">
+            <p class="text-white/60 text-xs font-semibold uppercase tracking-wide mb-2.5">Stats to show</p>
+            <div class="grid grid-cols-2 gap-1.5">
+              @for (s of statDefs; track s.key) {
+                <button class="py-2 px-3 rounded-xl text-xs font-semibold border transition-all text-left"
+                  [style.background]="stats()[s.key] ? 'rgba(233,30,140,.18)' : 'transparent'"
+                  [style.color]="stats()[s.key] ? '#e91e8c' : 'rgba(255,255,255,.4)'"
+                  [style.border-color]="stats()[s.key] ? '#e91e8c' : 'rgba(255,255,255,.12)'"
+                  (click)="toggleStat(s.key)">
+                  {{ s.label }}
+                  @if (stats()[s.key]) { <span class="float-right">✓</span> }
+                </button>
+              }
+            </div>
+          </section>
+
+          <!-- Tag -->
+          <section class="bg-white/10 rounded-2xl p-4">
+            <p class="text-white/60 text-xs font-semibold uppercase tracking-wide mb-2">Your tag</p>
+            <input type="text"
               class="w-full bg-white/10 text-white text-sm rounded-xl px-3 py-2 border border-white/20 focus:outline-none focus:border-pink-400 transition-colors"
-              placeholder="e.g. @icvanee"
-              [ngModel]="brandingText()"
-              (ngModelChange)="brandingText.set($event); redraw()"
-            />
-            <p class="text-white/30 text-xs mt-1.5">Shown bottom-right on the card</p>
-          </div>
+              placeholder="@icvanee"
+              [ngModel]="tag()" (ngModelChange)="tag.set($event); redraw()" />
+          </section>
 
           <!-- Actions -->
           <div class="flex gap-2">
-            <button
-              class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
-              style="background-color: #e91e8c"
-              (click)="download()"
-            >
-              <mat-icon class="!w-4 !h-4 text-base">download</mat-icon>
-              Download
+            <button class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+              style="background:#e91e8c" (click)="download()">
+              <mat-icon class="!w-4 !h-4 text-base">download</mat-icon> Download
             </button>
-            <button
-              class="py-2.5 px-4 rounded-xl text-sm font-semibold text-white/70 border border-white/20 hover:bg-white/10 transition-colors"
-              (click)="close.emit()"
-            >
-              Close
-            </button>
+            <button class="py-2.5 px-4 rounded-xl text-sm font-semibold text-white/70 border border-white/20 hover:bg-white/10 transition-colors"
+              (click)="close.emit()">Close</button>
           </div>
-
         </div>
       </div>
     </div>
@@ -133,364 +120,371 @@ export class ShareCardComponent implements AfterViewInit {
   @ViewChild('card') canvasRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('fileInput') fileInputRef!: ElementRef<HTMLInputElement>;
 
-  bgMode = signal<BgMode>('dark');
-  customBgImg = signal<HTMLImageElement | null>(null);
-  brandingText = signal('@icvanee');
+  bgMode   = signal<BgMode>('dark');
+  layout   = signal<Layout>('padded');
+  tag      = signal('@icvanee');
+  mapLoading = signal(false);
 
-  private statsMap = signal<Record<string, boolean>>({
-    distance: true,
-    pace: true,
-    time: true,
-    hr: true,
-  });
+  private customImg  = signal<HTMLImageElement | null>(null);
+  private tileCache  = new Map<string, HTMLImageElement>();
+
+  stats = signal<Record<string, boolean>>({ distance:true, pace:true, time:true, hr:true });
 
   statDefs = [
-    { key: 'distance', label: 'Distance' },
-    { key: 'pace',     label: 'Pace'     },
-    { key: 'time',     label: 'Time'     },
-    { key: 'hr',       label: 'Avg HR'   },
+    { key:'distance', label:'Distance' },
+    { key:'pace',     label:'Pace'     },
+    { key:'time',     label:'Time'     },
+    { key:'hr',       label:'Avg HR'   },
   ];
 
-  statEnabled(key: string): boolean {
-    return this.statsMap()[key] ?? false;
-  }
+  bgDefs: { mode: BgMode; label: string }[] = [
+    { mode:'dark',   label:'🌙 Dark'   },
+    { mode:'light',  label:'☀️ Light'  },
+    { mode:'map',    label:'🗺 Map'    },
+    { mode:'custom', label:'🖼 Photo'  },
+  ];
 
-  toggleStat(key: string): void {
-    this.statsMap.update(m => ({ ...m, [key]: !m[key] }));
-    this.redraw();
-  }
+  toggleStat(k: string) { this.stats.update(m => ({ ...m, [k]: !m[k] })); this.redraw(); }
+  setBg(m: BgMode)      { this.bgMode.set(m); this.redraw(); }
+  setLayout(l: Layout)  { this.layout.set(l); this.redraw(); }
+  pickFile()            { this.fileInputRef.nativeElement.click(); }
 
-  setBg(mode: BgMode): void {
-    this.bgMode.set(mode);
-    this.redraw();
-  }
-
-  pickFile(): void {
-    this.fileInputRef.nativeElement.click();
-  }
-
-  onFileChange(event: Event): void {
-    const file = (event.target as HTMLInputElement).files?.[0];
+  onFileChange(e: Event) {
+    const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = ev => {
       const img = new Image();
-      img.onload = () => {
-        this.customBgImg.set(img);
-        this.bgMode.set('custom');
-        this.redraw();
-      };
-      img.src = e.target?.result as string;
+      img.onload = () => { this.customImg.set(img); this.bgMode.set('custom'); this.redraw(); };
+      img.src = ev.target?.result as string;
     };
     reader.readAsDataURL(file);
   }
 
-  ngAfterViewInit(): void {
-    Promise.resolve().then(() => this.draw());
-  }
+  ngAfterViewInit() { Promise.resolve().then(() => this.draw()); }
+  redraw()          { Promise.resolve().then(() => this.draw()); }
 
-  redraw(): void {
-    Promise.resolve().then(() => this.draw());
-  }
+  onOverlayClick(e: MouseEvent) { if (e.target === e.currentTarget) this.close.emit(); }
 
-  onOverlayClick(event: MouseEvent): void {
-    if (event.target === event.currentTarget) this.close.emit();
-  }
-
-  download(): void {
+  download() {
     const canvas = this.canvasRef.nativeElement;
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const safeName = (this.activity.name ?? 'run').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-      a.download = `${safeName}_${this.brandingText().replace(/[^a-z0-9]/gi, '')}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 'image/png');
+    try {
+      canvas.toBlob(blob => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${(this.activity.name ?? 'run').replace(/[^a-z0-9]/gi,'_').toLowerCase()}.png`;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+      }, 'image/png');
+    } catch {
+      alert('Could not export — map tiles may be blocking canvas export. Try Dark or Light background.');
+    }
   }
 
-  private draw(): void {
+  // ── Draw ─────────────────────────────────────────────────────────────────────
+
+  private async draw() {
     const canvas = this.canvasRef?.nativeElement;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const W = 1080, H = 1080;
-    const mode = this.bgMode();
+    const mode   = this.bgMode();
+    const layout = this.layout();
+    const coords = this.activity.summaryPolyline ? decodePolyline(this.activity.summaryPolyline) : [];
 
     ctx.clearRect(0, 0, W, H);
 
     // ── Background ────────────────────────────────────────────────────────────
-    if (mode === 'dark') {
-      this.drawDarkBg(ctx, W, H);
+    if (mode === 'map' && coords.length > 1) {
+      const drawn = await this.drawMapBg(ctx, coords);
+      if (!drawn) this.drawDarkBg(ctx); // fallback
     } else if (mode === 'light') {
-      this.drawLightBg(ctx, W, H);
+      this.drawLightBg(ctx);
     } else if (mode === 'custom') {
-      const img = this.customBgImg();
-      if (img) {
-        this.drawCustomBg(ctx, img, W, H);
-      } else {
-        this.drawDarkBg(ctx, W, H);
-      }
+      const img = this.customImg();
+      img ? this.drawCustomBg(ctx, img) : this.drawDarkBg(ctx);
+    } else {
+      this.drawDarkBg(ctx);
     }
 
     // ── Route ─────────────────────────────────────────────────────────────────
-    const polyline = this.activity.summaryPolyline;
-    if (polyline) {
-      const coords = decodePolyline(polyline);
-      if (coords.length > 1) {
-        this.drawRoute(ctx, coords, W, H, mode);
-      }
+    if (coords.length > 1) {
+      this.drawRoute(ctx, coords, mode, layout);
     }
 
     // ── Stats panel ───────────────────────────────────────────────────────────
-    this.drawStats(ctx, W, H, mode);
+    const activeStats = this.statDefs
+      .filter(s => this.stats()[s.key])
+      .map(s => ({ ...s, value: this.statValue(s.key) }))
+      .filter(s => s.value !== null) as { key:string; label:string; value:string }[];
 
-    // ── Activity name ─────────────────────────────────────────────────────────
-    const titleColor = mode === 'light' ? '#1a0a2e' : '#ffffff';
-    ctx.fillStyle = titleColor;
-    ctx.font = 'bold 44px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'left';
+    if (activeStats.length > 0) {
+      this.drawStats(ctx, activeStats, mode);
+    }
+
+    // ── Header text ───────────────────────────────────────────────────────────
+    const textColor = mode === 'light' ? '#1a0a2e' : '#ffffff';
+    const mutedColor = mode === 'light' ? 'rgba(26,10,46,.5)' : 'rgba(255,255,255,.5)';
+
+    ctx.font = 'bold 44px system-ui,sans-serif';
+    ctx.fillStyle = textColor; ctx.textAlign = 'left';
     ctx.fillText(truncate(this.activity.name, 26), 52, 80);
 
-    // ── Date ──────────────────────────────────────────────────────────────────
-    const dateStr = new Date(this.activity.startDate).toLocaleDateString('en-GB', {
-      day: 'numeric', month: 'short', year: 'numeric',
-    });
-    ctx.fillStyle = mode === 'light' ? 'rgba(26,10,46,0.5)' : 'rgba(255,255,255,0.5)';
-    ctx.font = '26px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'right';
+    const dateStr = new Date(this.activity.startDate).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+    ctx.font = '26px system-ui,sans-serif';
+    ctx.fillStyle = mutedColor; ctx.textAlign = 'right';
     ctx.fillText(dateStr, W - 52, 80);
 
-    // ── Branding ──────────────────────────────────────────────────────────────
-    ctx.fillStyle = '#e91e8c';
-    ctx.font = 'bold 28px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText(this.brandingText(), W - 52, H - 32);
+    // ── Tag ───────────────────────────────────────────────────────────────────
+    ctx.font = 'bold 28px system-ui,sans-serif';
+    ctx.fillStyle = '#e91e8c'; ctx.textAlign = 'right';
+    ctx.fillText(this.tag(), W - 52, H - 32);
   }
 
-  private drawDarkBg(ctx: CanvasRenderingContext2D, W: number, H: number): void {
-    const bg = ctx.createLinearGradient(0, 0, W, H);
-    bg.addColorStop(0, '#0d0a1a');
-    bg.addColorStop(0.5, '#1a0a2e');
-    bg.addColorStop(1, '#0d0a1a');
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, H);
-    // subtle grid
-    ctx.strokeStyle = 'rgba(255,255,255,0.025)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x <= W; x += 60) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-    }
-    for (let y = 0; y <= H; y += 60) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    }
-    // vignette
-    const vignette = ctx.createRadialGradient(W / 2, H / 2, W * 0.3, W / 2, H / 2, W * 0.8);
-    vignette.addColorStop(0, 'rgba(0,0,0,0)');
-    vignette.addColorStop(1, 'rgba(0,0,0,0.4)');
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, W, H);
+  // ── Background helpers ────────────────────────────────────────────────────────
+
+  private drawDarkBg(ctx: CanvasRenderingContext2D) {
+    const g = ctx.createLinearGradient(0,0,W,H);
+    g.addColorStop(0,'#0d0a1a'); g.addColorStop(.5,'#1a0a2e'); g.addColorStop(1,'#0d0a1a');
+    ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle = 'rgba(255,255,255,.025)'; ctx.lineWidth = 1;
+    for (let x=0;x<=W;x+=60) { ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke(); }
+    for (let y=0;y<=H;y+=60) { ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
+    const v = ctx.createRadialGradient(W/2,H/2,W*.3,W/2,H/2,W*.8);
+    v.addColorStop(0,'rgba(0,0,0,0)'); v.addColorStop(1,'rgba(0,0,0,.4)');
+    ctx.fillStyle=v; ctx.fillRect(0,0,W,H);
   }
 
-  private drawLightBg(ctx: CanvasRenderingContext2D, W: number, H: number): void {
-    const bg = ctx.createLinearGradient(0, 0, W, H);
-    bg.addColorStop(0, '#f8f0ff');
-    bg.addColorStop(1, '#fff0f8');
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, H);
-    // subtle dot pattern
-    ctx.fillStyle = 'rgba(26,10,46,0.04)';
-    for (let x = 30; x < W; x += 40) {
-      for (let y = 30; y < H; y += 40) {
-        ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill();
+  private drawLightBg(ctx: CanvasRenderingContext2D) {
+    const g = ctx.createLinearGradient(0,0,W,H);
+    g.addColorStop(0,'#f8f0ff'); g.addColorStop(1,'#fff0f8');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(26,10,46,.04)';
+    for (let x=30;x<W;x+=40) for (let y=30;y<H;y+=40) {
+      ctx.beginPath(); ctx.arc(x,y,1.5,0,Math.PI*2); ctx.fill();
+    }
+  }
+
+  private drawCustomBg(ctx: CanvasRenderingContext2D, img: HTMLImageElement) {
+    const s = Math.max(W/img.width, H/img.height);
+    ctx.drawImage(img,(W-img.width*s)/2,(H-img.height*s)/2,img.width*s,img.height*s);
+    const ov = ctx.createLinearGradient(0,0,0,H);
+    ov.addColorStop(0,'rgba(0,0,0,.45)'); ov.addColorStop(.5,'rgba(0,0,0,.2)'); ov.addColorStop(1,'rgba(0,0,0,.65)');
+    ctx.fillStyle=ov; ctx.fillRect(0,0,W,H);
+  }
+
+  private async drawMapBg(ctx: CanvasRenderingContext2D, coords: [number,number][]): Promise<boolean> {
+    let minLat=Infinity, maxLat=-Infinity, minLng=Infinity, maxLng=-Infinity;
+    for (const [la,ln] of coords) {
+      if(la<minLat)minLat=la; if(la>maxLat)maxLat=la;
+      if(ln<minLng)minLng=ln; if(ln>maxLng)maxLng=ln;
+    }
+
+    const zoom = calcZoom(minLat, maxLat, minLng, maxLng);
+    const tl   = latLngToTileF(maxLat, minLng, zoom);
+    const br   = latLngToTileF(minLat, maxLng, zoom);
+
+    // add padding in tile-space
+    const pad  = 0.6;
+    const txMin = Math.floor(tl.x - pad), txMax = Math.ceil(br.x + pad);
+    const tyMin = Math.floor(tl.y - pad), tyMax = Math.ceil(br.y + pad);
+
+    // pixel-per-tile scale so route fills canvas
+    const tileSpanX = txMax - txMin, tileSpanY = tyMax - tyMin;
+    const tileSize  = Math.min(W / tileSpanX, H / tileSpanY);
+
+    this.mapLoading.set(true);
+
+    const promises: Promise<void>[] = [];
+    const tiles: { img:HTMLImageElement; cx:number; cy:number }[] = [];
+
+    for (let tx=txMin; tx<txMax; tx++) {
+      for (let ty=tyMin; ty<tyMax; ty++) {
+        const key = `${zoom}/${tx}/${ty}`;
+        const cx  = (tx - txMin) * tileSize + (W - tileSpanX * tileSize) / 2;
+        const cy  = (ty - tyMin) * tileSize + (H - tileSpanY * tileSize) / 2;
+
+        if (this.tileCache.has(key)) {
+          tiles.push({ img: this.tileCache.get(key)!, cx, cy });
+        } else {
+          promises.push(new Promise<void>(resolve => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload  = () => { this.tileCache.set(key, img); tiles.push({img, cx, cy}); resolve(); };
+            img.onerror = () => resolve();
+            // CARTO dark-matter tiles — CORS-friendly, no API key needed for basic use
+            img.src = `https://a.basemaps.cartocdn.com/dark_matter/${zoom}/${tx}/${ty}.png`;
+          }));
+        }
       }
     }
+
+    try {
+      await Promise.all(promises);
+    } catch { this.mapLoading.set(false); return false; }
+
+    this.mapLoading.set(false);
+
+    if (tiles.length === 0) return false;
+
+    for (const t of tiles) ctx.drawImage(t.img, t.cx, t.cy, tileSize, tileSize);
+
+    // slight darkening overlay so route + text pop
+    const ov = ctx.createRadialGradient(W/2,H/2,W*.1,W/2,H/2,W*.72);
+    ov.addColorStop(0,'rgba(0,0,0,.05)'); ov.addColorStop(1,'rgba(0,0,0,.45)');
+    ctx.fillStyle=ov; ctx.fillRect(0,0,W,H);
+
+    return true;
   }
 
-  private drawCustomBg(ctx: CanvasRenderingContext2D, img: HTMLImageElement, W: number, H: number): void {
-    // Cover-fit the image
-    const scale = Math.max(W / img.width, H / img.height);
-    const sw = img.width * scale;
-    const sh = img.height * scale;
-    ctx.drawImage(img, (W - sw) / 2, (H - sh) / 2, sw, sh);
-    // Dark overlay so text/route are readable
-    const overlay = ctx.createLinearGradient(0, 0, 0, H);
-    overlay.addColorStop(0, 'rgba(0,0,0,0.45)');
-    overlay.addColorStop(0.5, 'rgba(0,0,0,0.2)');
-    overlay.addColorStop(1, 'rgba(0,0,0,0.65)');
-    ctx.fillStyle = overlay;
-    ctx.fillRect(0, 0, W, H);
-  }
+  // ── Route drawing ─────────────────────────────────────────────────────────────
 
-  private drawRoute(
-    ctx: CanvasRenderingContext2D,
-    coords: [number, number][],
-    W: number,
-    H: number,
-    mode: BgMode,
-  ): void {
-    let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
-    for (const [lat, lng] of coords) {
-      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
-      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng;
+  private drawRoute(ctx: CanvasRenderingContext2D, coords: [number,number][], mode: BgMode, layout: Layout) {
+    let minLat=Infinity,maxLat=-Infinity,minLng=Infinity,maxLng=-Infinity;
+    for (const [la,ln] of coords) {
+      if(la<minLat)minLat=la; if(la>maxLat)maxLat=la;
+      if(ln<minLng)minLng=ln; if(ln>maxLng)maxLng=ln;
     }
-    const latSpan = maxLat - minLat || 0.001;
-    const lngSpan = maxLng - minLng || 0.001;
+    const latSpan = maxLat-minLat||.001, lngSpan = maxLng-minLng||.001;
 
-    const statsH = 170; // height reserved for stats panel
-    const pad = 80;
-    const boxW = W - pad * 2;
-    const boxH = H - pad * 2 - statsH - 60; // leave space top for header
-    const boxX = pad;
-    const boxY = pad + 50;
+    const statsH  = 158;
+    const headerH = 100;
 
-    const scale = Math.min(boxW / lngSpan, boxH / latSpan) * 0.88;
+    let boxX: number, boxY: number, boxW: number, boxH: number;
+    if (layout === 'full') {
+      const pad = 44;
+      boxX = pad; boxY = headerH;
+      boxW = W - pad*2; boxH = H - headerH - statsH - 8;
+    } else {
+      const pad = 70;
+      boxX = pad; boxY = headerH + 10;
+      boxW = W - pad*2; boxH = H - headerH - statsH - 60;
+    }
 
-    const renderedW = lngSpan * scale;
-    const renderedH = latSpan * scale;
-    const shiftX = boxX + (boxW - renderedW) / 2;
-    const shiftY = boxY + (boxH - renderedH) / 2;
+    const scale = Math.min(boxW/lngSpan, boxH/latSpan) * .88;
+    const rW = lngSpan*scale, rH = latSpan*scale;
+    const oX = boxX + (boxW-rW)/2, oY = boxY + (boxH-rH)/2;
 
-    const toCanvas = ([lat, lng]: [number, number]): [number, number] => [
-      shiftX + (lng - minLng) * scale,
-      shiftY + renderedH - (lat - minLat) * scale,
+    const toC = ([la,ln]: [number,number]): [number,number] => [
+      oX + (ln-minLng)*scale,
+      oY + rH - (la-minLat)*scale,
     ];
 
-    const routeColor = mode === 'light' ? '#1a0a2e' : '#e91e8c';
-    const glowColor = mode === 'light' ? 'rgba(26,10,46,0.1)' : 'rgba(233,30,140,0.2)';
+    const isMap    = mode === 'map';
+    const isLight  = mode === 'light';
+    const lineColor = isLight ? '#1a0a2e' : '#e91e8c';
+    const glowColor = isLight ? 'rgba(26,10,46,.12)' : isMap ? 'rgba(255,255,255,.2)' : 'rgba(233,30,140,.22)';
+    const mainColor = isMap ? '#ffffff' : lineColor;
 
-    // Glow
-    ctx.beginPath();
-    ctx.moveTo(...toCanvas(coords[0]));
-    for (let i = 1; i < coords.length; i++) ctx.lineTo(...toCanvas(coords[i]));
-    ctx.strokeStyle = glowColor;
-    ctx.lineWidth = 14;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.stroke();
+    // glow pass
+    ctx.beginPath(); ctx.moveTo(...toC(coords[0]));
+    for (let i=1;i<coords.length;i++) ctx.lineTo(...toC(coords[i]));
+    ctx.strokeStyle=glowColor; ctx.lineWidth=16; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke();
 
-    // Main line
-    ctx.beginPath();
-    ctx.moveTo(...toCanvas(coords[0]));
-    for (let i = 1; i < coords.length; i++) ctx.lineTo(...toCanvas(coords[i]));
-    ctx.strokeStyle = routeColor;
-    ctx.lineWidth = mode === 'light' ? 5 : 4;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.stroke();
+    // main line
+    ctx.beginPath(); ctx.moveTo(...toC(coords[0]));
+    for (let i=1;i<coords.length;i++) ctx.lineTo(...toC(coords[i]));
+    ctx.strokeStyle=mainColor; ctx.lineWidth=isLight?5:4; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke();
 
-    // Start dot (white)
-    const [sx, sy] = toCanvas(coords[0]);
-    ctx.beginPath(); ctx.arc(sx, sy, 9, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff'; ctx.fill();
-    ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI * 2);
-    ctx.fillStyle = routeColor; ctx.fill();
+    // on map mode: pink accent over white line
+    if (isMap) {
+      ctx.beginPath(); ctx.moveTo(...toC(coords[0]));
+      for (let i=1;i<coords.length;i++) ctx.lineTo(...toC(coords[i]));
+      ctx.strokeStyle='rgba(233,30,140,.55)'; ctx.lineWidth=2; ctx.stroke();
+    }
 
-    // End dot (filled)
-    const [ex, ey] = toCanvas(coords[coords.length - 1]);
-    ctx.beginPath(); ctx.arc(ex, ey, 11, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff'; ctx.fill();
-    ctx.beginPath(); ctx.arc(ex, ey, 7, 0, Math.PI * 2);
-    ctx.fillStyle = routeColor; ctx.fill();
+    // start dot
+    const [sx,sy]=toC(coords[0]);
+    ctx.beginPath(); ctx.arc(sx,sy,9,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+    ctx.beginPath(); ctx.arc(sx,sy,5,0,Math.PI*2); ctx.fillStyle=isMap?'#e91e8c':mainColor; ctx.fill();
+
+    // end dot
+    const [ex,ey]=toC(coords[coords.length-1]);
+    ctx.beginPath(); ctx.arc(ex,ey,11,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+    ctx.beginPath(); ctx.arc(ex,ey,7,0,Math.PI*2); ctx.fillStyle='#e91e8c'; ctx.fill();
   }
 
-  private drawStats(ctx: CanvasRenderingContext2D, W: number, H: number, mode: BgMode): void {
-    const a = this.activity;
-    const enabled = this.statsMap();
+  // ── Stats panel ───────────────────────────────────────────────────────────────
 
-    const allStats = [
-      { key: 'distance', label: 'Distance', value: `${(a.distance / 1000).toFixed(2)} km` },
-      { key: 'pace',     label: 'Pace',     value: `${formatPace(a.distance, a.movingTime)} /km` },
-      { key: 'time',     label: 'Time',     value: formatTime(a.movingTime) },
-      ...(a.averageHeartrate ? [{ key: 'hr', label: 'Avg HR', value: `${Math.round(a.averageHeartrate)} bpm` }] : []),
-    ].filter(s => enabled[s.key]);
-
-    if (allStats.length === 0) return;
-
-    const panelH = 150;
-    const panelTop = H - panelH - 52;
-    const panelX = 44;
-    const panelW = W - 88;
-    const r = 18;
-
-    // Panel background
+  private drawStats(ctx: CanvasRenderingContext2D, items: {label:string;value:string}[], mode: BgMode) {
+    const pH=150, pTop=H-pH-48, pX=44, pW=W-88, r=18;
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(panelX + r, panelTop);
-    ctx.lineTo(panelX + panelW - r, panelTop);
-    ctx.arcTo(panelX + panelW, panelTop, panelX + panelW, panelTop + r, r);
-    ctx.lineTo(panelX + panelW, panelTop + panelH - r);
-    ctx.arcTo(panelX + panelW, panelTop + panelH, panelX + panelW - r, panelTop + panelH, r);
-    ctx.lineTo(panelX + r, panelTop + panelH);
-    ctx.arcTo(panelX, panelTop + panelH, panelX, panelTop + panelH - r, r);
-    ctx.lineTo(panelX, panelTop + r);
-    ctx.arcTo(panelX, panelTop, panelX + r, panelTop, r);
-    ctx.closePath();
-
-    if (mode === 'light') {
-      ctx.fillStyle = 'rgba(26,10,46,0.88)';
-    } else {
-      ctx.fillStyle = 'rgba(8,4,22,0.78)';
-    }
+    ctx.moveTo(pX+r,pTop); ctx.lineTo(pX+pW-r,pTop);
+    ctx.arcTo(pX+pW,pTop,pX+pW,pTop+r,r); ctx.lineTo(pX+pW,pTop+pH-r);
+    ctx.arcTo(pX+pW,pTop+pH,pX+pW-r,pTop+pH,r); ctx.lineTo(pX+r,pTop+pH);
+    ctx.arcTo(pX,pTop+pH,pX,pTop+pH-r,r); ctx.lineTo(pX,pTop+r);
+    ctx.arcTo(pX,pTop,pX+r,pTop,r); ctx.closePath();
+    ctx.fillStyle = mode==='light' ? 'rgba(26,10,46,.88)' : 'rgba(8,4,22,.78)';
     ctx.fill();
-    ctx.strokeStyle = 'rgba(233,30,140,0.3)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    ctx.strokeStyle='rgba(233,30,140,.3)'; ctx.lineWidth=1.5; ctx.stroke();
     ctx.restore();
 
-    const colW = panelW / allStats.length;
-    const labelY = panelTop + 44;
-    const valueY = panelTop + 108;
-
-    ctx.textAlign = 'center';
-    for (let i = 0; i < allStats.length; i++) {
-      const cx = panelX + colW * i + colW / 2;
-      ctx.fillStyle = 'rgba(255,255,255,0.45)';
-      ctx.font = '21px system-ui, -apple-system, sans-serif';
-      ctx.fillText(allStats[i].label, cx, labelY);
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${allStats.length > 3 ? 38 : 44}px system-ui, -apple-system, sans-serif`;
-      ctx.fillText(allStats[i].value, cx, valueY);
+    const cW=pW/items.length;
+    ctx.textAlign='center';
+    for (let i=0;i<items.length;i++) {
+      const cx=pX+cW*i+cW/2;
+      ctx.fillStyle='rgba(255,255,255,.45)';
+      ctx.font='21px system-ui,sans-serif';
+      ctx.fillText(items[i].label, cx, pTop+44);
+      ctx.fillStyle='#ffffff';
+      ctx.font=`bold ${items.length>3?38:44}px system-ui,sans-serif`;
+      ctx.fillText(items[i].value, cx, pTop+108);
     }
+  }
+
+  private statValue(key: string): string | null {
+    const a = this.activity;
+    if (key==='distance') return `${(a.distance/1000).toFixed(2)} km`;
+    if (key==='pace')     return `${formatPace(a.distance,a.movingTime)} /km`;
+    if (key==='time')     return formatTime(a.movingTime);
+    if (key==='hr')       return a.averageHeartrate ? `${Math.round(a.averageHeartrate)} bpm` : null;
+    return null;
   }
 }
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
-function decodePolyline(encoded: string): [number, number][] {
-  const coords: [number, number][] = [];
-  let index = 0, lat = 0, lng = 0;
-  while (index < encoded.length) {
-    let result = 0, shift = 0, b: number;
-    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-    lat += (result & 1) ? ~(result >> 1) : result >> 1;
-    result = 0; shift = 0;
-    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-    lng += (result & 1) ? ~(result >> 1) : result >> 1;
-    coords.push([lat * 1e-5, lng * 1e-5]);
+function decodePolyline(enc: string): [number,number][] {
+  const out:[number,number][]=[];
+  let i=0,lat=0,lng=0;
+  while(i<enc.length){
+    let r=0,s=0,b:number;
+    do{b=enc.charCodeAt(i++)-63;r|=(b&0x1f)<<s;s+=5;}while(b>=0x20);
+    lat+=(r&1)?~(r>>1):r>>1;
+    r=0;s=0;
+    do{b=enc.charCodeAt(i++)-63;r|=(b&0x1f)<<s;s+=5;}while(b>=0x20);
+    lng+=(r&1)?~(r>>1):r>>1;
+    out.push([lat*1e-5,lng*1e-5]);
   }
-  return coords;
+  return out;
 }
 
-function formatTime(s: number): string {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  return h > 0
-    ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
-    : `${m}:${String(sec).padStart(2, '0')}`;
+function latLngToTileF(lat: number, lng: number, z: number): {x:number;y:number} {
+  const n=Math.pow(2,z), lr=lat*Math.PI/180;
+  return { x:(lng+180)/360*n, y:(1-Math.log(Math.tan(lr)+1/Math.cos(lr))/Math.PI)/2*n };
 }
 
-function formatPace(dist: number, time: number): string {
-  if (!dist || !time) return '—';
-  const p = time / 60 / (dist / 1000);
-  return `${Math.floor(p)}:${String(Math.round((p % 1) * 60)).padStart(2, '0')}`;
+function calcZoom(minLat:number,maxLat:number,minLng:number,maxLng:number): number {
+  for (let z=16;z>=8;z--) {
+    const tl=latLngToTileF(maxLat,minLng,z), br=latLngToTileF(minLat,maxLng,z);
+    if((br.x-tl.x)*256<=W*.72 && (br.y-tl.y)*256<=H*.72) return z;
+  }
+  return 8;
 }
 
-function truncate(s: string, max: number): string {
-  return s.length <= max ? s : s.slice(0, max - 1) + '…';
+function formatTime(s:number):string {
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+  return h>0?`${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`:`${m}:${String(sec).padStart(2,'0')}`;
 }
+
+function formatPace(dist:number,time:number):string {
+  if(!dist||!time)return'—';
+  const p=time/60/(dist/1000);
+  return`${Math.floor(p)}:${String(Math.round((p%1)*60)).padStart(2,'0')}`;
+}
+
+function truncate(s:string,max:number):string{return s.length<=max?s:s.slice(0,max-1)+'…';}
