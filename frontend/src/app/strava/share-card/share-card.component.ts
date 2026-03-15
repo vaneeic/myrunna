@@ -23,7 +23,7 @@ const W = 1080, H = 1080;
     <div class="fixed inset-0 z-[100] overflow-y-auto bg-black/80"
          (click)="onOverlayClick($event)">
       <div class="min-h-full flex items-center justify-center p-3 pb-24">
-      <div class="flex flex-col lg:flex-row gap-5 items-start"
+      <div class="flex flex-col md:flex-row gap-5 items-start"
            (click)="$event.stopPropagation()">
 
         <!-- Canvas preview -->
@@ -39,7 +39,7 @@ const W = 1080, H = 1080;
         </div>
 
         <!-- Controls -->
-        <div class="flex flex-col gap-3 lg:w-64 w-full text-white">
+        <div class="flex flex-col gap-3 md:w-64 w-full text-white">
 
           <!-- Background -->
           <section class="bg-white/10 rounded-2xl p-4">
